@@ -1,4 +1,4 @@
-# streamlit_app.py - ENHANCED VERSION WITH GOVERNMENT PRECISION
+# streamlit_app.py 
 # Production-Ready AI Civil Engineering Estimator v2.0
 
 import streamlit as st
