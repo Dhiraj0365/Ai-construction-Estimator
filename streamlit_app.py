@@ -29,7 +29,7 @@ with st.sidebar:
     st.divider()
     
     # Your Drive folder link
-    drive_folder_id = "1lGa6PaLktE7Tl-C-yDDDUiRx-1lOgLHH"  # ← REPLACE WITH YOUR FOLDER ID
+    drive_folder_id = "1lGa6PaLktE7Tl-C-yDDDUiRx-1lOgLHH"  # REPLACE WITH YOUR FOLDER ID
     drive_link = f"https://drive.google.com/drive/folders/{drive_folder_id}"
     
     st.markdown(f"**📁 [Open Drive Folder]({drive_link})**")
