@@ -1,5 +1,4 @@
 import streamlit as st
-from is1200_rules import IS1200Engine
 
 engine = IS1200Engine()
 
