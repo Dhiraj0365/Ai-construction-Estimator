@@ -1,0 +1,5 @@
+if st.button("Calculate Concrete Volume and Add"):
+    # Code here runs only once on button click
+    volume = length * width * thickness  # Simplified example
+    st.session_state['volume'] = volume  # Save in session state to keep for next reruns
+    st.success(f"Added volume: {volume:.3f} cubic meters")
