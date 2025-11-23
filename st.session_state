@@ -1,1 +1,5 @@
+length = st.number_input("Length (m)", min_value=0.1)
+width = st.number_input("Width (m)", min_value=0.1)
+thickness = st.number_input("Thickness (m)", min_value=0.05)
+grade = st.selectbox("Concrete Grade", ["M15", "M20", "M25"])
 
