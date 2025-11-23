@@ -1,30 +1,23 @@
-import streamlit as st
-
+# is1200_rules.py
 
 class IS1200Engine:
     def __init__(self):
-        # initialization code here
         pass
 
-    engine = IS1200Engine()
+    def measure_concrete(self, length, width, thickness, grade, element_type='slab'):
+        # calculation code here
+        quantity = length * width * thickness
+        description = f"Concrete {grade} {element_type}"
+        unit = "Cum"
+        is_code_ref = "IS 1200 Part 9"
+        return MeasurementItem(description, quantity, unit, is_code_ref)
 
-st.header("Quantity Takeoff Input")
+# Dataclass for measurement results
+from dataclasses import dataclass
 
-length = st.number_input("Length (m)", min_value=0.1, value=10.0)
-width = st.number_input("Width (m)", min_value=0.1, value=5.0)
-thickness = st.number_input("Thickness (m)", min_value=0.05, value=0.15)
-grade = st.selectbox("Concrete Grade", ["M15", "M20", "M25", "M30"])
-
-if st.button("Calculate Concrete Volume"):
-    item = engine.measure_concrete(length, width, thickness, grade=grade, element_type='slab')
-    st.success(f"Calculated volume: {item.quantity} {item.unit} ({item.description})")
-    
-    if 'qto_items' not in st.session_state:
-        st.session_state['qto_items'] = []
-    
-    st.session_state['qto_items'].append(item)
-
-if 'qto_items' in st.session_state and st.session_state['qto_items']:
-    st.subheader("Current QTO Items")
-    for i, itm in enumerate(st.session_state['qto_items'], 1):
-        st.write(f"{i}. {itm.description} - {itm.quantity} {itm.unit} [{itm.is_code_ref}]")
+@dataclass
+class MeasurementItem:
+    description: str
+    quantity: float
+    unit: str
+    is_code_ref: str
