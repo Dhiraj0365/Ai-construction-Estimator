@@ -1,6 +1,12 @@
 import streamlit as st
 
-engine = IS1200Engine()
+
+class IS1200Engine:
+    def __init__(self):
+        # initialization code here
+        pass
+
+    engine = IS1200Engine()
 
 st.header("Quantity Takeoff Input")
 
