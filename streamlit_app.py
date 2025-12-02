@@ -43,11 +43,19 @@ tab_qto, tab_rate, tab_boq = st.tabs(["Quantity Take-Off", "Rate Analysis", "Bil
 with tab_qto:
     st.subheader("Quantity Take-Off (IS 1200)")
 
-    qto_type = st.selectbox(
-        "Measurement Type",
-        ["Earthwork Excavation", "RCC Slab (M25)"],
-        index=0,
-    )
+ qto_type = st.selectbox(
+    "Measurement Type",
+    [
+        "Earthwork Excavation (IS 1200 Part 1 & 2)",
+        "Plain Concrete (IS 1200 Part 2)",
+        "RCC Slab M25 (IS 1200 Part 2 & IS 456)",
+        "Brick Masonry (IS 1200 Part 3)",
+        "Plastering (IS 1200 Part 12)",
+        "Flooring (IS 1200 Part 11)",
+    ],
+    index=0,
+)
+
 
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -66,22 +74,65 @@ with tab_qto:
 
     if st.button("Add Measured Item to QTO"):
         try:
-            if qto_type == "Earthwork Excavation":
-                item = engine.measure_earthwork(
-                    length=length,
-                    width=width,
-                    depth=depth_or_thk,
-                    lead=lead,
-                    soil_type="ordinary",
-                )
-            else:
-                item = engine.measure_concrete(
-                    length=length,
-                    width=width,
-                    thickness=depth_or_thk,
-                    grade=grade,
-                    element_type="slab",
-                )
+            if st.button("Add Measured Item to QTO"):
+    try:
+        if "Earthwork Excavation" in qto_type:
+            item = engine.measure_earthwork(
+                length=length,
+                width=width,
+                depth=depth_or_thk,
+                lead=lead,
+                soil_type="ordinary",
+            )
+
+        elif "Plain Concrete" in qto_type:
+            item = engine.measure_concrete(
+                length=length,
+                width=width,
+                thickness=depth_or_thk,
+                grade="Plain",
+                element_type="PCC",
+            )
+
+        elif "RCC Slab M25" in qto_type:
+            item = engine.measure_concrete(
+                length=length,
+                width=width,
+                thickness=depth_or_thk,
+                grade="M25",
+                element_type="slab",
+            )
+
+        elif "Brick Masonry" in qto_type:
+            item = engine.measure_masonry(
+                length=length,
+                width=width,
+                thickness=depth_or_thk,
+                material="brick",
+            )
+
+        elif "Plastering" in qto_type:
+            item = engine.measure_plaster(
+                length=length,
+                height=depth_or_thk,  # reuse depth field as height for walls
+                thickness_mm=12,
+            )
+
+        elif "Flooring" in qto_type:
+            item = engine.measure_flooring(
+                length=length,
+                width=width,
+                thickness_mm=20,
+            )
+
+        else:
+            raise ValueError("Unsupported measurement type selected.")
+
+        st.session_state.qto_items.append(item)
+        st.success(f"Added: {item.description} — {item.quantity:.2f} {item.unit}")
+    except Exception as e:
+        st.error(f"Error while adding item: {e}")
+
 
             st.session_state.qto_items.append(item)
             st.success(f"Added: {item.description} — {item.quantity:.2f} {item.unit}")
