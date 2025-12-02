@@ -1,18 +1,26 @@
-from dsr_parser import DSRParser
+import pandas as pd
 
-if st.sidebar.button("Parse DSR PDFs"):
-    if dsr_vol1 or dsr_vol2:
-        parser = DSRParser()
-        if dsr_vol1:
-            with open("/tmp/dsr_vol1.pdf", "wb") as f:
-                f.write(dsr_vol1.getbuffer())
-            parser.dsr_vol1_path = "/tmp/dsr_vol1.pdf"
-        if dsr_vol2:
-            with open("/tmp/dsr_vol2.pdf", "wb") as f:
-                f.write(dsr_vol2.getbuffer())
-            parser.dsr_vol2_path = "/tmp/dsr_vol2.pdf"
-        rates_df = parser.load_all_rates()
-        st.session_state['rates_df'] = rates_df
-        st.success(f"Loaded {len(rates_df)} rates from DSR files.")
-    else:
-        st.warning("Please upload at least one DSR PDF.")
+
+class DSRParser:
+    """
+    Placeholder DSR parser.
+    In a real app, parse CPWD/State DSR PDFs and return item/rate tables.
+    Here, we just provide a simple sample DataFrame interface.
+    """
+
+    def __init__(self):
+        self._df = pd.DataFrame(
+            [
+                {"code": "EW01", "description": "Earthwork excavation in ordinary soil", "unit": "Cum", "rate": 250.0},
+                {"code": "RCC01", "description": "RCC M25 concrete", "unit": "Cum", "rate": 7500.0},
+            ]
+        )
+
+    def get_rates(self) -> pd.DataFrame:
+        return self._df.copy()
+
+    def find_rate_by_keyword(self, keyword: str) -> float | None:
+        df = self._df[self._df["description"].str.contains(keyword, case=False, na=False)]
+        if df.empty:
+            return None
+        return float(df.iloc[0]["rate"])
