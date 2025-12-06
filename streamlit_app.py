@@ -230,8 +230,4 @@ with tab_boq:
 
 st.markdown("---")
 st.markdown("*Powered by IS 1200 standards | Rates are indicative - verify with latest DSR*")
-# In Rate Analysis tab, add this before rate inputs:
-uploaded_dsr = st.file_uploader("Upload DSR PDF", type="pdf")
-if uploaded_dsr:
-    rates_df = dsr_parser.parse_dsr(uploaded_dsr)
-    st.dataframe(rates_df)
+
