@@ -6,6 +6,9 @@ from io import BytesIO
 
 @dataclass
 class BOQItem:
+    """
+    Single BOQ line item.
+    """
     item_no: str
     description: str
     unit: str
@@ -18,10 +21,16 @@ class BOQItem:
 
 
 class BOQGenerator:
+    """
+    Helper to collect BOQ items and output them as
+    a pandas DataFrame and Excel bytes.
+    """
+
     def __init__(self):
         self.items: List[BOQItem] = []
 
-    def clear_items(self):
+    def clear_items(self) -> None:
+        """Remove all stored BOQ items."""
         self.items = []
 
     def add_boq_item(
@@ -35,7 +44,8 @@ class BOQGenerator:
         wbs_level1: str,
         wbs_level2: str,
         is_reference: str,
-    ):
+    ) -> None:
+        """Append one BOQ line item."""
         self.items.append(
             BOQItem(
                 item_no=item_no,
@@ -51,13 +61,27 @@ class BOQGenerator:
         )
 
     def generate_dataframe(self, project_name: str, project_location: str) -> pd.DataFrame:
+        """
+        Build a DataFrame in standard BOQ format.
+
+        Columns:
+        - Item No
+        - Description of Item
+        - Unit
+        - Quantity
+        - Rate (₹)
+        - Amount (₹)
+        - WBS Level 1
+        - WBS Level 2
+        - IS Reference
+        """
         data = [
             {
                 "Item No": it.item_no,
-                "Description": it.description,
+                "Description of Item": it.description,
                 "Unit": it.unit,
                 "Quantity": it.quantity,
-                "Rate (₹/Unit)": it.rate,
+                "Rate (₹)": it.rate,
                 "Amount (₹)": it.amount,
                 "WBS Level 1": it.wbs_level1,
                 "WBS Level 2": it.wbs_level2,
@@ -65,13 +89,21 @@ class BOQGenerator:
             }
             for it in self.items
         ]
+
         df = pd.DataFrame(data)
+        # Store metadata as attributes (can be used when writing Excel header)
         df.attrs["project_name"] = project_name
         df.attrs["project_location"] = project_location
         return df
 
     def to_excel_bytes(self, df: pd.DataFrame) -> bytes:
+        """
+        Convert the BOQ DataFrame to an in-memory Excel file (bytes),
+        ready for Streamlit download.
+        """
         output = BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            # Write BOQ sheet
             df.to_excel(writer, index=False, sheet_name="BOQ")
+
         return output.getvalue()
