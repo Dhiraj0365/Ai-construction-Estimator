@@ -4,7 +4,7 @@ import pandas as pd
 from is1200_rules import IS1200Engine, MeasurementItem
 from rate_analyzer import RateAnalyzer
 from boq_generator import BOQGenerator
-from dsr_parser import DSRParser  # placeholder but safe to keep
+from dsr_parser import DSRParser  # safe placeholder
 
 
 # ---------- SESSION STATE INITIALIZATION ----------
@@ -232,9 +232,10 @@ with tab_boq:
         boq_gen.clear_items()
         for idx, info in enumerate(st.session_state.rate_items, start=1):
             item = info["item"]
+            desc_lower = item.description.lower()
+
             with st.expander(f"Item {idx}: {item.description}", expanded=True):
                 col1, col2 = st.columns(2)
-                desc_lower = item.description.lower()
 
                 with col1:
                     item_no = st.text_input(
@@ -312,28 +313,40 @@ with tab_boq:
             )
             st.dataframe(section_totals, use_container_width=True)
 
-            # Grand total
+            # Base total
             base_total = df_boq["Amount (₹)"].sum()
             st.metric("💎 BASE TOTAL", f"₹{base_total:,.0f}")
 
-            st.markdown("### ⚙️ Contingency & Overheads")
+            st.markdown("### ⚙️ Contingency, Overheads, Profit & GST")
+
             contingency_pct = st.number_input(
                 "Contingency (%)", min_value=0.0, value=3.0, step=0.5
             )
             overhead_pct = st.number_input(
-                "Office overheads (%)", min_value=0.0, value=2.0, step=0.5
+                "Departmental overheads (%)", min_value=0.0, value=2.0, step=0.5
+            )
+            profit_pct = st.number_input(
+                "Contractor's profit (%)", min_value=0.0, value=10.0, step=0.5
+            )
+            gst_pct = st.number_input(
+                "GST (%)", min_value=0.0, value=18.0, step=0.5
             )
 
             contingency_amt = base_total * contingency_pct / 100.0
             overhead_amt = base_total * overhead_pct / 100.0
-            final_total = base_total + contingency_amt + overhead_amt
+            works_plus_overheads = base_total + contingency_amt + overhead_amt
+            profit_amt = works_plus_overheads * profit_pct / 100.0
+            tax_base = works_plus_overheads + profit_amt
+            gst_amt = tax_base * gst_pct / 100.0
+            final_total = tax_base + gst_amt
 
             st.write(f"Contingency ({contingency_pct:.1f}%): ₹{contingency_amt:,.0f}")
-            st.write(f"Overheads ({overhead_pct:.1f}%): ₹{overhead_amt:,.0f}")
-            st.metric(
-                "🔹 TOTAL including contingency & overheads",
-                f"₹{final_total:,.0f}",
+            st.write(
+                f"Departmental overheads ({overhead_pct:.1f}%): ₹{overhead_amt:,.0f}"
             )
+            st.write(f"Contractor's profit ({profit_pct:.1f}%): ₹{profit_amt:,.0f}")
+            st.write(f"GST ({gst_pct:.1f}%): ₹{gst_amt:,.0f}")
+            st.metric("🔹 SANCTION ESTIMATE TOTAL", f"₹{final_total:,.0f}")
 
             # Download BOQ + Abstract as Excel
             excel_bytes = boq_gen.to_excel_bytes(
@@ -342,6 +355,8 @@ with tab_boq:
                 base_total=base_total,
                 contingency_pct=contingency_pct,
                 overhead_pct=overhead_pct,
+                profit_pct=profit_pct,
+                gst_pct=gst_pct,
             )
             st.download_button(
                 label="⬇️ Download BOQ + Abstract (Excel)",
@@ -353,5 +368,5 @@ with tab_boq:
 
 st.markdown("---")
 st.markdown(
-    "*Based on IS 1200 measurement standards. Verify rates with latest CPWD/State DSR before tender use.*"
+    "*Based on IS 1200 measurement standards. Verify rates and percentages with latest CPWD/State rules before tender use.*"
 )
