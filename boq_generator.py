@@ -202,3 +202,4 @@ class BOQGenerator:
                 df_abs.to_excel(writer, index=False, sheet_name="Abstract")
 
         return output.getvalue()
+        
