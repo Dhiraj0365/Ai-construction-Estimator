@@ -102,12 +102,14 @@ class BOQGenerator:
         base_total: float | None = None,
         contingency_pct: float | None = None,
         overhead_pct: float | None = None,
+        profit_pct: float | None = None,
+        gst_pct: float | None = None,
     ) -> bytes:
         """
         Convert the BOQ DataFrame to an in-memory Excel file (bytes),
         with two sheets:
         - 'BOQ'      : Detailed item-wise BOQ
-        - 'Abstract' : Section-wise totals + contingency & overheads
+        - 'Abstract' : Section-wise totals + percentage provisions
         """
         output = BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
@@ -117,46 +119,83 @@ class BOQGenerator:
             # Sheet 2: Abstract of cost
             abstract_rows = []
 
-            if section_totals is not None:
+            # Section-wise totals
+            if section_totals is not None and not section_totals.empty:
                 abstract_rows.append({"Head": "Section-wise totals", "Amount (₹)": ""})
                 for _, row in section_totals.iterrows():
                     abstract_rows.append(
                         {
-                            "Head": f"{row['WBS Level 1']}",
+                            "Head": str(row["WBS Level 1"]),
                             "Amount (₹)": row["Amount (₹)"],
                         }
                     )
 
-            if base_total is not None:
-                abstract_rows.append({"Head": "", "Amount (₹)": ""})
-                abstract_rows.append({"Head": "Base total", "Amount (₹)": base_total})
-
-            if base_total is not None and contingency_pct is not None:
-                cont_amt = base_total * contingency_pct / 100.0
-                abstract_rows.append(
-                    {
-                        "Head": f"Add: Contingency @ {contingency_pct:.1f}%",
-                        "Amount (₹)": cont_amt,
-                    }
-                )
-            else:
-                cont_amt = 0.0
-
-            if base_total is not None and overhead_pct is not None:
-                oh_amt = base_total * overhead_pct / 100.0
-                abstract_rows.append(
-                    {
-                        "Head": f"Add: Office overheads @ {overhead_pct:.1f}%",
-                        "Amount (₹)": oh_amt,
-                    }
-                )
-            else:
-                oh_amt = 0.0
+            # Base total and percentage provisions
+            cont_amt = 0.0
+            oh_amt = 0.0
+            profit_amt = 0.0
+            gst_amt = 0.0
 
             if base_total is not None:
-                final_total = base_total + cont_amt + oh_amt
                 abstract_rows.append({"Head": "", "Amount (₹)": ""})
-                abstract_rows.append({"Head": "Grand total", "Amount (₹)": final_total})
+                abstract_rows.append(
+                    {
+                        "Head": "Base total",
+                        "Amount (₹)": base_total,
+                    }
+                )
+
+                # Contingency
+                if contingency_pct is not None:
+                    cont_amt = base_total * contingency_pct / 100.0
+                    abstract_rows.append(
+                        {
+                            "Head": f"Add: Contingency @ {contingency_pct:.1f}%",
+                            "Amount (₹)": cont_amt,
+                        }
+                    )
+
+                # Overheads
+                if overhead_pct is not None:
+                    oh_amt = base_total * overhead_pct / 100.0
+                    abstract_rows.append(
+                        {
+                            "Head": f"Add: Departmental overheads @ {overhead_pct:.1f}%",
+                            "Amount (₹)": oh_amt,
+                        }
+                    )
+
+                # Contractor's profit
+                if profit_pct is not None:
+                    profit_base = base_total + cont_amt + oh_amt
+                    profit_amt = profit_base * profit_pct / 100.0
+                    abstract_rows.append(
+                        {
+                            "Head": f"Add: Contractor's profit @ {profit_pct:.1f}%",
+                            "Amount (₹)": profit_amt,
+                        }
+                    )
+
+                # GST
+                if gst_pct is not None:
+                    tax_base = base_total + cont_amt + oh_amt + profit_amt
+                    gst_amt = tax_base * gst_pct / 100.0
+                    abstract_rows.append(
+                        {
+                            "Head": f"Add: GST @ {gst_pct:.1f}%",
+                            "Amount (₹)": gst_amt,
+                        }
+                    )
+
+                # Grand total
+                final_total = base_total + cont_amt + oh_amt + profit_amt + gst_amt
+                abstract_rows.append({"Head": "", "Amount (₹)": ""})
+                abstract_rows.append(
+                    {
+                        "Head": "Grand total",
+                        "Amount (₹)": final_total,
+                    }
+                )
 
             if abstract_rows:
                 df_abs = pd.DataFrame(abstract_rows)
