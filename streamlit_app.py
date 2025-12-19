@@ -4,7 +4,7 @@ import pandas as pd
 from is1200_rules import IS1200Engine, MeasurementItem
 from rate_analyzer import RateAnalyzer
 from boq_generator import BOQGenerator
-from dsr_parser import DSRParser  # safe placeholder
+from dsr_parser import DSRParser
 
 
 # ---------- SESSION STATE INITIALIZATION ----------
@@ -38,7 +38,7 @@ risk_level = st.sidebar.selectbox("Risk Level", ["Low", "Medium", "High"])
 
 st.title("🧮 AI Construction Estimator")
 st.caption(
-    "Quantity Take-Off (QTO), Rate Analysis, and Bill of Quantities (BOQ) as per IS 1200 standards."
+    "Quantity Take-Off (QTO), Rate Analysis, and Bill of Quantities (BOQ) as per IS 1200 standards with DSR mapping."
 )
 
 tab_qto, tab_rate, tab_boq = st.tabs(
@@ -254,6 +254,12 @@ with tab_boq:
                         ),
                         key=f"wbs1_{idx}",
                     )
+                    dsr_code_input = st.text_input(
+                        "DSR Code (optional)",
+                        value="",
+                        key=f"dsr_code_{idx}",
+                        help="Enter or select the DSR item code for this BOQ line.",
+                    )
 
                 with col2:
                     wbs_l2 = st.text_input(
@@ -273,6 +279,33 @@ with tab_boq:
                         ),
                         key=f"wbs2_{idx}",
                     )
+
+                # Suggest DSR items
+                if st.button("🔎 Suggest DSR items", key=f"suggest_dsr_{idx}"):
+                    keyword = ""
+                    if "earthwork" in desc_lower or "excavation" in desc_lower:
+                        keyword = "earth"
+                    elif "plain cement concrete" in desc_lower or "pcc" in desc_lower:
+                        keyword = "plain cement concrete"
+                    elif "reinforced cement concrete" in desc_lower or "rcc" in desc_lower:
+                        keyword = "reinforced cement concrete"
+                    elif "masonry" in desc_lower:
+                        keyword = "brick masonry"
+                    elif "plaster" in desc_lower:
+                        keyword = "plaster"
+                    elif "floor" in desc_lower or "tile" in desc_lower:
+                        keyword = "floor"
+
+                    if keyword:
+                        matches = dsr_parser.find_matches(keyword, unit=item.unit)
+                    else:
+                        matches = dsr_parser.get_all_items()
+
+                    if matches.empty:
+                        st.warning("No matching DSR items found. Please enter code manually.")
+                    else:
+                        st.write("Suggested DSR items from DSR CSV:")
+                        st.dataframe(matches, use_container_width=True)
 
                 st.info(
                     f"Rate: ₹{info['rate']:.2f}/{item.unit} | Amount: ₹{info['amount']:,.2f}"
@@ -368,5 +401,5 @@ with tab_boq:
 
 st.markdown("---")
 st.markdown(
-    "*Based on IS 1200 measurement standards. Verify rates and percentages with latest CPWD/State rules before tender use.*"
+    "*Based on IS 1200 measurement standards. Verify DSR codes, rates and percentages with latest CPWD/State rules before tender use.*"
 )
