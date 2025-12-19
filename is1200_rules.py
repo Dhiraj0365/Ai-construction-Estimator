@@ -184,3 +184,72 @@ class IS1200Engine:
             unit="Sqm",
             is_code_ref="IS 1200 Part 11",
         )
+
+    # -----------------------------
+    # 6. Formwork (Shuttering)
+    # -----------------------------
+    def measure_formwork(
+        self,
+        area: float,
+        element_type: str = "beam",
+    ) -> MeasurementItem:
+        """
+        Formwork measured as surface area in contact with concrete.
+
+        Reference:
+        - IS 1200 Part 5: Formwork
+        Unit: Sqm
+        """
+        desc = f"Formwork for {element_type.lower()} (surface in contact with concrete)"
+        return MeasurementItem(
+            description=desc,
+            quantity=area,
+            unit="Sqm",
+            is_code_ref="IS 1200 Part 5",
+        )
+
+    # -----------------------------
+    # 7. Reinforcement steel
+    # -----------------------------
+    def measure_reinforcement(
+        self,
+        weight_kg: float,
+        bar_type: str = "TMT",
+    ) -> MeasurementItem:
+        """
+        Reinforcement generally measured by weight.
+
+        Reference:
+        - IS 1200 (steel reinforcement / structural steel practice)
+        Unit: Kg
+        """
+        desc = f"Reinforcement steel ({bar_type}) in RCC work"
+        return MeasurementItem(
+            description=desc,
+            quantity=weight_kg,
+            unit="Kg",
+            is_code_ref="IS 1200 Part 8",
+        )
+
+    # -----------------------------
+    # 8. Painting / Finishing
+    # -----------------------------
+    def measure_painting(
+        self,
+        area: float,
+        system: str = "Acrylic paint",
+    ) -> MeasurementItem:
+        """
+        Painting / finishing measured as area.
+
+        Reference:
+        - IS 1200 Part 13: Whitewashing, colour washing, distempering and painting
+        Unit: Sqm
+        """
+        desc = f"Painting / finishing with {system}"
+        return MeasurementItem(
+            description=desc,
+            quantity=area,
+            unit="Sqm",
+            is_code_ref="IS 1200 Part 13",
+        )
