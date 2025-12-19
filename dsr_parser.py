@@ -7,13 +7,17 @@ class DSRParser:
     """
     DSR (Schedule of Rates) helper for the AI Construction Estimator.
 
-    - Loads items from a CSV file (dsr_items.csv by default)
-    - Allows keyword + unit-based search
-    - Provides rates by DSR code
+    - Expects a CSV file named 'dsr_items.csv' in the repo root (same folder as streamlit_app.py)
+    - CSV columns: code, description, unit, rate
+    - Supports:
+        * get_all_items()
+        * find_matches(keyword, unit=None)
+        * get_rate_for_code(code)
     """
 
-    def __init__(self, csv_path: str = "dsr_items.csv"):
-        self.csv_path = csv_path
+    def __init__(self, csv_name: str = "dsr_items.csv"):
+        # CSV is expected in the same directory as this script / main app
+        self.csv_name = csv_name
         self._df: pd.DataFrame | None = None
 
     # -----------------------------
@@ -21,9 +25,9 @@ class DSRParser:
     # -----------------------------
     def _load_dsr(self) -> pd.DataFrame:
         """
-        Load DSR data from CSV into a DataFrame.
+        Load DSR data from dsr_items.csv into a DataFrame.
 
-        Expected columns in dsr_items.csv:
+        Expected columns:
         - code        : DSR item number (e.g., 2.8.1)
         - description : Official description
         - unit        : Unit (e.g., Cum, Sqm)
@@ -32,32 +36,41 @@ class DSRParser:
         if self._df is not None:
             return self._df
 
-        path = Path(self.csv_path)
+        # Resolve path relative to current working directory (Streamlit runs from repo root)
+        path = Path(self.csv_name)
+
         if path.is_file():
             try:
-                self._df = pd.read_csv(path)
+                df = pd.read_csv(path)
             except Exception as e:
-                st.warning(f"Unable to read {self.csv_path}, using sample DSR data. Error: {e}")
-                self._df = self._sample_dsr()
+                st.warning(f"Unable to read {self.csv_name}, using sample DSR data instead. Error: {e}")
+                df = self._sample_dsr()
         else:
-            st.info(f"{self.csv_path} not found in repo. Using sample DSR items.")
-            self._df = self._sample_dsr()
+            st.info(f"DSR CSV '{self.csv_name}' not found in repo root. Using sample DSR items.")
+            df = self._sample_dsr()
 
-        # Basic sanity clean-up
-        for col in ["code", "description", "unit"]:
-            if col in self._df.columns:
-                self._df[col] = self._df[col].astype(str)
+        # Normalize columns
+        required_cols = {"code", "description", "unit", "rate"}
+        missing = required_cols - set(df.columns.str.lower())
+        if missing:
+            st.warning(f"{self.csv_name} is missing columns: {missing}. Using sample DSR items instead.")
+            df = self._sample_dsr()
 
-        if "rate" in self._df.columns:
-            self._df["rate"] = pd.to_numeric(self._df["rate"], errors="coerce")
-        else:
-            self._df["rate"] = None
+        # Standardize column names
+        df.columns = [c.lower().strip() for c in df.columns]
 
+        # Cast types
+        df["code"] = df["code"].astype(str)
+        df["description"] = df["description"].astype(str)
+        df["unit"] = df["unit"].astype(str)
+        df["rate"] = pd.to_numeric(df["rate"], errors="coerce")
+
+        self._df = df
         return self._df
 
     def _sample_dsr(self) -> pd.DataFrame:
         """
-        Fallback sample DSR data used if CSV is missing or invalid.
+        Fallback sample DSR data used if dsr_items.csv is missing or invalid.
         """
         return pd.DataFrame(
             [
