@@ -38,7 +38,7 @@ risk_level = st.sidebar.selectbox("Risk Level", ["Low", "Medium", "High"])
 
 st.title("🧮 AI Construction Estimator")
 st.caption(
-    "Quantity Take-Off (QTO), Rate Analysis, and Bill of Quantities (BOQ) as per IS 1200 standards with DSR mapping."
+    "Quantity Take-Off (QTO), Rate Analysis, and BOQ as per IS 1200 with basic DSR mapping."
 )
 
 tab_qto, tab_rate, tab_boq = st.tabs(
@@ -58,6 +58,9 @@ with tab_qto:
             "Brick Masonry (IS 1200 Part 3)",
             "Plastering (IS 1200 Part 12)",
             "Flooring (IS 1200 Part 11)",
+            "Formwork (IS 1200 Part 5)",
+            "Reinforcement Steel (IS 1200 Part 8)",
+            "Painting / Finishing (IS 1200 Part 13)",
         ],
         index=0,
     )
@@ -69,7 +72,8 @@ with tab_qto:
         width = st.number_input("Width (m)", min_value=0.1, value=5.0)
     with col3:
         depth_or_thk = st.number_input(
-            "Depth / Thickness / Height (m)", min_value=0.05, value=1.2
+            "Depth / Thickness / Height (m or kg*)", min_value=0.05, value=1.2,
+            help="For reinforcement, treat this as total weight in kg for now."
         )
 
     lead = st.number_input("Lead (m) (for earthwork)", min_value=0.0, value=50.0)
@@ -84,6 +88,7 @@ with tab_qto:
                     lead=lead,
                     soil_type="ordinary",
                 )
+
             elif "Plain Concrete" in qto_type:
                 item = engine.measure_concrete(
                     length=length,
@@ -92,6 +97,7 @@ with tab_qto:
                     grade="Plain",
                     element_type="PCC",
                 )
+
             elif "RCC Slab M25" in qto_type:
                 item = engine.measure_concrete(
                     length=length,
@@ -100,6 +106,7 @@ with tab_qto:
                     grade="M25",
                     element_type="slab",
                 )
+
             elif "Brick Masonry" in qto_type:
                 item = engine.measure_masonry(
                     length=length,
@@ -107,18 +114,44 @@ with tab_qto:
                     thickness=depth_or_thk,
                     material="brick",
                 )
+
             elif "Plastering" in qto_type:
                 item = engine.measure_plaster(
                     length=length,
                     height=depth_or_thk,
                     thickness_mm=12.0,
                 )
+
             elif "Flooring" in qto_type:
                 item = engine.measure_flooring(
                     length=length,
                     width=width,
                     thickness_mm=20.0,
                 )
+
+            elif "Formwork" in qto_type:
+                # Approximate vertical shuttering area as L x H
+                form_area = length * depth_or_thk
+                item = engine.measure_formwork(
+                    area=form_area,
+                    element_type="beam/slab",
+                )
+
+            elif "Reinforcement Steel" in qto_type:
+                # Interpret depth_or_thk as total reinforcement weight in kg
+                item = engine.measure_reinforcement(
+                    weight_kg=depth_or_thk,
+                    bar_type="TMT",
+                )
+
+            elif "Painting / Finishing" in qto_type:
+                # Approximate wall area as L x H
+                paint_area = length * depth_or_thk
+                item = engine.measure_painting(
+                    area=paint_area,
+                    system="Acrylic paint",
+                )
+
             else:
                 st.error("Unsupported measurement type selected.")
                 st.stop()
@@ -170,16 +203,24 @@ with tab_rate:
                 expanded=True,
             ):
                 desc_lower = item.description.lower()
-                if "earthwork" in desc_lower:
-                    default_rate = 250.0
-                elif any(x in desc_lower for x in ["concrete", "rcc", "pcc"]):
+                if "earthwork" in desc_lower or "excavation" in desc_lower:
+                    default_rate = 260.0
+                elif any(x in desc_lower for x in ["plain cement concrete", "pcc"]):
+                    default_rate = 4500.0
+                elif any(x in desc_lower for x in ["reinforced cement concrete", "rcc"]):
                     default_rate = 7500.0
                 elif "masonry" in desc_lower:
                     default_rate = 5500.0
                 elif "plaster" in desc_lower:
                     default_rate = 250.0
-                elif "floor" in desc_lower:
+                elif "floor" in desc_lower or "tile" in desc_lower:
                     default_rate = 800.0
+                elif "formwork" in desc_lower:
+                    default_rate = 900.0
+                elif "reinforcement steel" in desc_lower:
+                    default_rate = 80.0  # ₹/kg
+                elif "painting" in desc_lower or "finishing" in desc_lower:
+                    default_rate = 120.0
                 else:
                     default_rate = 1000.0
 
@@ -245,11 +286,15 @@ with tab_boq:
                         "WBS Level 1",
                         value=(
                             "Earthwork"
-                            if "earthwork" in desc_lower
+                            if "earthwork" in desc_lower or "excavation" in desc_lower
                             else "Concrete"
-                            if "concrete" in desc_lower or "rcc" in desc_lower
+                            if "concrete" in desc_lower or "rcc" in desc_lower or "pcc" in desc_lower
                             else "Masonry"
                             if "masonry" in desc_lower
+                            else "Formwork"
+                            if "formwork" in desc_lower
+                            else "Reinforcement"
+                            if "reinforcement steel" in desc_lower
                             else "Finishes"
                         ),
                         key=f"wbs1_{idx}",
@@ -266,15 +311,19 @@ with tab_boq:
                         "WBS Level 2",
                         value=(
                             "Excavation"
-                            if "earthwork" in desc_lower
+                            if "earthwork" in desc_lower or "excavation" in desc_lower
                             else "Structural concrete"
                             if "rcc" in desc_lower
                             else "PCC"
                             if "plain cement concrete" in desc_lower
                             else "Wall masonry"
                             if "masonry" in desc_lower
-                            else "Plaster"
-                            if "plaster" in desc_lower
+                            else "Shuttering"
+                            if "formwork" in desc_lower
+                            else "Reinforcement"
+                            if "reinforcement steel" in desc_lower
+                            else "Painting"
+                            if "painting" in desc_lower or "finishing" in desc_lower
                             else "Flooring"
                         ),
                         key=f"wbs2_{idx}",
@@ -295,6 +344,12 @@ with tab_boq:
                         keyword = "plaster"
                     elif "floor" in desc_lower or "tile" in desc_lower:
                         keyword = "floor"
+                    elif "formwork" in desc_lower:
+                        keyword = "formwork"
+                    elif "reinforcement steel" in desc_lower or "tmt" in desc_lower:
+                        keyword = "reinforcement"
+                    elif "painting" in desc_lower or "finishing" in desc_lower:
+                        keyword = "paint"
 
                     if keyword:
                         matches = dsr_parser.find_matches(keyword, unit=item.unit)
