@@ -53,7 +53,7 @@ dsr_year = st.sidebar.text_input(
 
 st.title("🧮 AI Construction Estimator")
 st.caption(
-    "Quantity Take-Off (QTO), Rate Analysis, and BOQ as per IS 1200 with DSR mapping, Cost Index, detailed rate analysis, and AI-assisted DSR suggestions."
+    "IS 1200-based Quantity Take-Off, Rate Analysis, and BOQ with DSR mapping, Cost Index, detailed rate analysis, and AI-assisted DSR suggestions."
 )
 
 tab_qto, tab_rate, tab_boq = st.tabs(
@@ -62,24 +62,29 @@ tab_qto, tab_rate, tab_boq = st.tabs(
 
 # ============================= TAB 1: QTO =============================
 with tab_qto:
-    st.subheader("Quantity Take-Off (IS 1200)")
+    st.subheader("Quantity Take-Off (IS 1200 measurement rules)")
 
     qto_type = st.selectbox(
         "Measurement Type",
         [
             "Earthwork Excavation (IS 1200 Part 1 & 2)",
-            "Plain Concrete (IS 1200 Part 2)",
-            "RCC Slab M25 (IS 1200 Part 2 & IS 456)",
+            "PCC (Plain Cement Concrete) (IS 1200 Part 2)",
+            "RCC Slab (M25)",
+            "RCC Beam (M25)",
+            "RCC Column (M25)",
+            "RCC Footing (M25)",
             "Brick Masonry (IS 1200 Part 3)",
             "Plastering (IS 1200 Part 12)",
             "Flooring (IS 1200 Part 11)",
             "Formwork (IS 1200 Part 5)",
-            "Reinforcement Steel (IS 1200 Part 8)",
+            "Reinforcement Steel (direct kg)",
+            "Reinforcement Steel (from RCC volume)",
             "Painting / Finishing (IS 1200 Part 13)",
         ],
         index=0,
     )
 
+    # Common geometry inputs
     col1, col2, col3 = st.columns(3)
     with col1:
         length = st.number_input("Length (m)", min_value=0.1, value=10.0)
@@ -87,14 +92,276 @@ with tab_qto:
         width = st.number_input("Width (m)", min_value=0.1, value=5.0)
     with col3:
         depth_or_thk = st.number_input(
-            "Depth / Thickness / Height (m or kg*)",
+            "Depth / Height / Thickness (m or kg*)",
             min_value=0.05,
             value=1.2,
-            help="For reinforcement, treat this as total weight in kg for now.",
+            help="For reinforcement (direct kg), treat this as total weight in kg.",
         )
 
+    # ---------------- EARTHWORK EXTRAS ----------------
     lead = st.number_input("Lead (m) (for earthwork)", min_value=0.0, value=50.0)
 
+    soil_type = "ordinary"
+    depth_band = "up to 1.5 m"
+    lead_band = "up to 50 m"
+
+    if "Earthwork Excavation" in qto_type:
+        st.markdown("#### Earthwork classification (IS 1200 Part 1 & 2)")
+        col_ew1, col_ew2, col_ew3 = st.columns(3)
+        with col_ew1:
+            soil_type = st.selectbox(
+                "Soil type",
+                [
+                    "ordinary",
+                    "hard soil",
+                    "soft rock",
+                    "hard rock (blasting)",
+                    "hard rock (blasting prohibited)",
+                ],
+                index=0,
+                help="Classify soil as per DSR / project specifications.",
+            )
+        with col_ew2:
+            depth_band = st.selectbox(
+                "Depth range",
+                ["up to 1.5 m", "1.5 m to 3.0 m", "3.0 m to 4.5 m", "exceeding 4.5 m"],
+                index=0,
+                help="Lift band for excavation as per IS 1200 & DSR.",
+            )
+        with col_ew3:
+            lead_band = st.selectbox(
+                "Lead range",
+                ["up to 50 m", "50 m to 250 m", "250 m to 500 m", "exceeding 500 m"],
+                index=0,
+                help="Horizontal lead band for disposal of excavated earth.",
+            )
+
+    # ---------------- MASONRY EXTRAS ----------------
+    n_small_openings = 0
+    area_small_each = 0.0
+    n_large_openings = 0
+    area_large_each = 0.0
+
+    if "Brick Masonry" in qto_type:
+        st.markdown("#### Masonry openings (IS 1200 Part 3)")
+        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+        with col_m1:
+            n_small_openings = st.number_input(
+                "No. of small openings (≤ 0.1 m²)",
+                min_value=0,
+                value=0,
+                step=1,
+            )
+        with col_m2:
+            area_small_each = st.number_input(
+                "Area of each small opening (m²)",
+                min_value=0.0,
+                value=0.05,
+                step=0.01,
+                help="No deduction will be made for these, but recorded for info.",
+            )
+        with col_m3:
+            n_large_openings = st.number_input(
+                "No. of large openings (> 0.1 m²)",
+                min_value=0,
+                value=0,
+                step=1,
+            )
+        with col_m4:
+            area_large_each = st.number_input(
+                "Area of each large opening (m²)",
+                min_value=0.0,
+                value=1.0,
+                step=0.05,
+                help="These openings will be deducted from masonry volume.",
+            )
+
+    # ---------------- PLASTER EXTRAS ----------------
+    plaster_faces = 1
+    p_n_small_openings = 0
+    p_area_small_each = 0.0
+    p_n_large_openings = 0
+    p_area_large_each = 0.0
+
+    if "Plastering" in qto_type:
+        st.markdown("#### Plastering details (IS 1200 Part 12)")
+        col_p0, col_p1, col_p2 = st.columns(3)
+        with col_p0:
+            plaster_faces = st.selectbox(
+                "Number of faces plastered",
+                [1, 2],
+                index=1,
+                help="1 = single side plaster; 2 = both sides of wall.",
+            )
+        with col_p1:
+            p_n_small_openings = st.number_input(
+                "No. of small openings (≤ 0.5 m²)",
+                min_value=0,
+                value=0,
+                step=1,
+            )
+        with col_p2:
+            p_area_small_each = st.number_input(
+                "Area of each small opening (m²)",
+                min_value=0.0,
+                value=0.25,
+                step=0.01,
+                help="Openings ≤ 0.5 m²; no deduction will be made.",
+            )
+
+        col_p3, col_p4 = st.columns(2)
+        with col_p3:
+            p_n_large_openings = st.number_input(
+                "No. of large openings (> 0.5 m²)",
+                min_value=0,
+                value=0,
+                step=1,
+            )
+        with col_p4:
+            p_area_large_each = st.number_input(
+                "Area of each large opening (m²)",
+                min_value=0.0,
+                value=1.0,
+                step=0.05,
+                help="These openings will be deducted from plaster area.",
+            )
+
+    # ---------------- PAINTING EXTRAS ----------------
+    paint_faces = 1
+    paint_coats = 2
+    paint_type = "acrylic"
+    paint_n_small_openings = 0
+    paint_area_small_each = 0.0
+    paint_n_large_openings = 0
+    paint_area_large_each = 0.0
+
+    if "Painting" in qto_type:
+        st.markdown("#### Painting details (IS 1200 Part 13)")
+        col_pa1, col_pa2, col_pa3 = st.columns(3)
+        with col_pa1:
+            paint_faces = st.selectbox(
+                "Number of faces painted",
+                [1, 2],
+                index=1,
+                help="1 = single side; 2 = both sides.",
+            )
+        with col_pa2:
+            paint_coats = st.number_input(
+                "Number of coats (primer + paint)",
+                min_value=1,
+                value=2,
+                step=1,
+                help="Affects rate, not quantity.",
+            )
+        with col_pa3:
+            paint_type = st.selectbox(
+                "Paint type",
+                ["acrylic", "oil", "emulsion", "enamel"],
+            )
+
+        col_pb1, col_pb2 = st.columns(2)
+        with col_pb1:
+            paint_n_small_openings = st.number_input(
+                "No. of small openings (≤ 0.5 m²)",
+                min_value=0,
+                value=0,
+                step=1,
+            )
+        with col_pb2:
+            paint_area_small_each = st.number_input(
+                "Area of each small opening (m²)",
+                min_value=0.0,
+                value=0.25,
+                step=0.01,
+                help="No deduction for these.",
+            )
+
+        col_pb3, col_pb4 = st.columns(2)
+        with col_pb3:
+            paint_n_large_openings = st.number_input(
+                "No. of large openings (> 0.5 m²)",
+                min_value=0,
+                value=0,
+                step=1,
+            )
+        with col_pb4:
+            paint_area_large_each = st.number_input(
+                "Area of each large opening (m²)",
+                min_value=0.0,
+                value=1.0,
+                step=0.05,
+                help="These will be deducted.",
+            )
+
+    # ---------------- FLOORING EXTRAS ----------------
+    f_n_small_openings = 0
+    f_area_small_each = 0.0
+    f_n_large_openings = 0
+    f_area_large_each = 0.0
+    floor_type = "cement concrete"
+    floor_thk_mm = 20.0
+
+    if "Flooring" in qto_type:
+        st.markdown("#### Flooring details (IS 1200 Part 11)")
+        col_f0, col_f1 = st.columns(2)
+        with col_f0:
+            floor_type = st.selectbox(
+                "Floor type",
+                ["cement concrete", "vitrified tiles", "ceramic tiles", "stone flooring"],
+            )
+        with col_f1:
+            floor_thk_mm = st.number_input(
+                "Floor thickness (mm)",
+                min_value=10.0,
+                value=20.0,
+                step=5.0,
+                help="For description and rate; quantity is in Sqm.",
+            )
+
+        col_f1a, col_f2a = st.columns(2)
+        with col_f1a:
+            f_n_small_openings = st.number_input(
+                "No. of small openings (≤ 0.1 m²)",
+                min_value=0,
+                value=0,
+                step=1,
+            )
+        with col_f2a:
+            f_area_small_each = st.number_input(
+                "Area of each small opening (m²)",
+                min_value=0.0,
+                value=0.05,
+                step=0.01,
+                help="No deduction for these.",
+            )
+
+        col_f3a, col_f4a = st.columns(2)
+        with col_f3a:
+            f_n_large_openings = st.number_input(
+                "No. of large openings (> 0.1 m²)",
+                min_value=0,
+                value=0,
+                step=1,
+            )
+        with col_f4a:
+            f_area_large_each = st.number_input(
+                "Area of each large opening (m²)",
+                min_value=0.0,
+                value=0.5,
+                step=0.05,
+                help="These will be deducted from floor area.",
+            )
+
+    # ---------------- FORMWORK EXTRAS ----------------
+    formwork_member_type = "slab"
+    if "Formwork" in qto_type:
+        formwork_member_type = st.selectbox(
+            "Formwork for",
+            ["slab", "beam", "column", "footing"],
+            help="Formwork measured on concrete contact area as per IS 1200 Part 5.",
+        )
+
+    # =================== ADD ITEM BUTTON ===================
     if st.button("➕ Add Measured Item to QTO", use_container_width=True):
         try:
             if "Earthwork Excavation" in qto_type:
@@ -102,11 +369,12 @@ with tab_qto:
                     length=length,
                     width=width,
                     depth=depth_or_thk,
-                    lead=lead,
-                    soil_type="ordinary",
+                    soil_type=soil_type,
+                    depth_band=depth_band,
+                    lead_band=lead_band,
                 )
 
-            elif "Plain Concrete" in qto_type:
+            elif "PCC (Plain Cement Concrete)" in qto_type:
                 item = engine.measure_concrete(
                     length=length,
                     width=width,
@@ -115,27 +383,64 @@ with tab_qto:
                     element_type="PCC",
                 )
 
-            elif "RCC Slab M25" in qto_type:
-                item = engine.measure_concrete(
+            elif "RCC Slab (M25)" in qto_type:
+                item = engine.measure_rcc_member(
+                    member_type="slab",
                     length=length,
                     width=width,
-                    thickness=depth_or_thk,
+                    depth_or_height=depth_or_thk,
                     grade="M25",
-                    element_type="slab",
+                )
+
+            elif "RCC Beam (M25)" in qto_type:
+                item = engine.measure_rcc_member(
+                    member_type="beam",
+                    length=length,
+                    width=width,
+                    depth_or_height=depth_or_thk,
+                    grade="M25",
+                )
+
+            elif "RCC Column (M25)" in qto_type:
+                item = engine.measure_rcc_member(
+                    member_type="column",
+                    length=length,
+                    width=width,
+                    depth_or_height=depth_or_thk,
+                    grade="M25",
+                )
+
+            elif "RCC Footing (M25)" in qto_type:
+                item = engine.measure_rcc_member(
+                    member_type="footing",
+                    length=length,
+                    width=width,
+                    depth_or_height=depth_or_thk,
+                    grade="M25",
                 )
 
             elif "Brick Masonry" in qto_type:
+                # length = wall length, depth_or_thk = wall height, width = thickness
                 item = engine.measure_masonry(
                     length=length,
-                    width=width,
-                    thickness=depth_or_thk,
+                    height=depth_or_thk,
+                    thickness=width,
                     material="brick",
+                    n_small_openings=n_small_openings,
+                    area_small_each=area_small_each,
+                    n_large_openings=n_large_openings,
+                    area_large_each=area_large_each,
                 )
 
             elif "Plastering" in qto_type:
                 item = engine.measure_plaster(
                     length=length,
                     height=depth_or_thk,
+                    face_count=plaster_faces,
+                    n_small_openings=p_n_small_openings,
+                    area_small_each=p_area_small_each,
+                    n_large_openings=p_n_large_openings,
+                    area_large_each=p_area_large_each,
                     thickness_mm=12.0,
                 )
 
@@ -143,27 +448,53 @@ with tab_qto:
                 item = engine.measure_flooring(
                     length=length,
                     width=width,
-                    thickness_mm=20.0,
+                    n_small_openings=f_n_small_openings,
+                    area_small_each=f_area_small_each,
+                    n_large_openings=f_n_large_openings,
+                    area_large_each=f_area_large_each,
+                    thickness_mm=floor_thk_mm,
+                    floor_type=floor_type,
                 )
 
             elif "Formwork" in qto_type:
-                form_area = length * depth_or_thk
                 item = engine.measure_formwork(
-                    area=form_area,
-                    element_type="beam/slab",
+                    member_type=formwork_member_type,
+                    length=length,
+                    width=width,
+                    depth_or_height=depth_or_thk,
                 )
 
-            elif "Reinforcement Steel" in qto_type:
+            elif "Reinforcement Steel (direct kg)" in qto_type:
                 item = engine.measure_reinforcement(
                     weight_kg=depth_or_thk,
                     bar_type="TMT",
                 )
 
-            elif "Painting / Finishing" in qto_type:
-                paint_area = length * depth_or_thk
+            elif "Reinforcement Steel (from RCC volume)" in qto_type:
+                # here we treat geometry as a slab by default for simplicity
+                rcc_item = engine.measure_rcc_member(
+                    member_type="slab",
+                    length=length,
+                    width=width,
+                    depth_or_height=depth_or_thk,
+                    grade="M25",
+                )
+                item = engine.estimate_reinforcement_from_rcc(
+                    member_type="slab",
+                    concrete_volume=rcc_item.quantity,
+                )
+
+            elif "Painting" in qto_type:
                 item = engine.measure_painting(
-                    area=paint_area,
-                    system="Acrylic paint",
+                    length=length,
+                    height=depth_or_thk,
+                    face_count=paint_faces,
+                    n_small_openings=paint_n_small_openings,
+                    area_small_each=paint_area_small_each,
+                    n_large_openings=paint_n_large_openings,
+                    area_large_each=paint_area_large_each,
+                    coats=paint_coats,
+                    paint_type=paint_type,
                 )
 
             else:
@@ -175,6 +506,7 @@ with tab_qto:
         except Exception as e:
             st.error(f"❌ Error while adding item: {e}")
 
+    # -------- Show QTO table --------
     if st.session_state.qto_items:
         st.markdown("### 📋 Current Measured Items")
         data = [
@@ -219,9 +551,9 @@ with tab_rate:
                 desc_lower = item.description.lower()
                 if "earthwork" in desc_lower or "excavation" in desc_lower:
                     base_rate = 260.0
-                elif any(x in desc_lower for x in ["plain cement concrete", "pcc"]):
+                elif "pcc" in desc_lower or "plain" in desc_lower and "concrete" in desc_lower:
                     base_rate = 4500.0
-                elif any(x in desc_lower for x in ["reinforced cement concrete", "rcc"]):
+                elif "rcc" in desc_lower:
                     base_rate = 7500.0
                 elif "masonry" in desc_lower:
                     base_rate = 5500.0
@@ -233,7 +565,7 @@ with tab_rate:
                     base_rate = 900.0
                 elif "reinforcement steel" in desc_lower:
                     base_rate = 80.0  # ₹/kg
-                elif "painting" in desc_lower or "finishing" in desc_lower:
+                elif "paint" in desc_lower or "finishing" in desc_lower:
                     base_rate = 120.0
                 else:
                     base_rate = 1000.0
@@ -373,9 +705,7 @@ with tab_boq:
                             "Earthwork"
                             if "earthwork" in desc_lower or "excavation" in desc_lower
                             else "Concrete"
-                            if "concrete" in desc_lower
-                            or "rcc" in desc_lower
-                            or "pcc" in desc_lower
+                            if "concrete" in desc_lower or "rcc" in desc_lower or "pcc" in desc_lower
                             else "Masonry"
                             if "masonry" in desc_lower
                             else "Formwork"
@@ -418,7 +748,7 @@ with tab_boq:
                             else "Reinforcement"
                             if "reinforcement steel" in desc_lower
                             else "Painting"
-                            if "painting" in desc_lower or "finishing" in desc_lower
+                            if "paint" in desc_lower or "finishing" in desc_lower
                             else "Flooring"
                         ),
                         key=f"wbs2_{idx}",
@@ -451,7 +781,7 @@ with tab_boq:
                             keyword = "formwork"
                         elif "reinforcement steel" in desc_lower or "tmt" in desc_lower:
                             keyword = "reinforcement"
-                        elif "painting" in desc_lower or "finishing" in desc_lower:
+                        elif "paint" in desc_lower or "finishing" in desc_lower:
                             keyword = "paint"
 
                     if keyword:
@@ -577,5 +907,5 @@ with tab_boq:
 
 st.markdown("---")
 st.markdown(
-    "*Based on IS 1200 measurement standards. Verify DSR codes, cost index, AI suggestions, rates and percentages with latest CPWD/State rules before tender use.*"
+    "*Based on IS 1200 measurement standards. Verify IS clauses, DSR codes, Cost Index, AI suggestions, and all rates/percentages with latest CPWD/State rules before tender use.*"
 )
