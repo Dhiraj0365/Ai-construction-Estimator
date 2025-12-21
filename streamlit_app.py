@@ -299,11 +299,11 @@ with tab_boq:
                         ),
                         key=f"wbs1_{idx}",
                     )
-                    dsr_code_input = st.text_input(
-                        "DSR Code (optional)",
+                    dsr_keyword = st.text_input(
+                        "DSR description keyword (optional)",
                         value="",
-                        key=f"dsr_code_{idx}",
-                        help="Enter or select the DSR item code for this BOQ line.",
+                        key=f"dsr_kw_{idx}",
+                        help="Type a word/phrase to search DSR, e.g. 'earthwork excavation', 'PCC 1:4:8', 'M25 slab', '12 mm plaster', 'vitrified tiles'.",
                     )
 
                 with col2:
@@ -329,27 +329,29 @@ with tab_boq:
                         key=f"wbs2_{idx}",
                     )
 
-                # Suggest DSR items
+                # Suggest DSR items based on keyword or auto keyword from description
                 if st.button("🔎 Suggest DSR items", key=f"suggest_dsr_{idx}"):
-                    keyword = ""
-                    if "earthwork" in desc_lower or "excavation" in desc_lower:
-                        keyword = "earth"
-                    elif "plain cement concrete" in desc_lower or "pcc" in desc_lower:
-                        keyword = "plain cement concrete"
-                    elif "reinforced cement concrete" in desc_lower or "rcc" in desc_lower:
-                        keyword = "reinforced cement concrete"
-                    elif "masonry" in desc_lower:
-                        keyword = "brick masonry"
-                    elif "plaster" in desc_lower:
-                        keyword = "plaster"
-                    elif "floor" in desc_lower or "tile" in desc_lower:
-                        keyword = "floor"
-                    elif "formwork" in desc_lower:
-                        keyword = "formwork"
-                    elif "reinforcement steel" in desc_lower or "tmt" in desc_lower:
-                        keyword = "reinforcement"
-                    elif "painting" in desc_lower or "finishing" in desc_lower:
-                        keyword = "paint"
+                    # If user typed a keyword, use it; otherwise infer from description
+                    keyword = dsr_keyword.strip()
+                    if not keyword:
+                        if "earthwork" in desc_lower or "excavation" in desc_lower:
+                            keyword = "earth work"
+                        elif "plain cement concrete" in desc_lower or "pcc" in desc_lower:
+                            keyword = "plain cement concrete"
+                        elif "reinforced cement concrete" in desc_lower or "rcc" in desc_lower:
+                            keyword = "reinforced cement concrete"
+                        elif "masonry" in desc_lower:
+                            keyword = "masonry"
+                        elif "plaster" in desc_lower:
+                            keyword = "plaster"
+                        elif "floor" in desc_lower or "tile" in desc_lower:
+                            keyword = "floor"
+                        elif "formwork" in desc_lower:
+                            keyword = "formwork"
+                        elif "reinforcement steel" in desc_lower or "tmt" in desc_lower:
+                            keyword = "reinforcement"
+                        elif "painting" in desc_lower or "finishing" in desc_lower:
+                            keyword = "paint"
 
                     if keyword:
                         matches = dsr_parser.find_matches(keyword, unit=item.unit)
@@ -357,9 +359,9 @@ with tab_boq:
                         matches = dsr_parser.get_all_items()
 
                     if matches.empty:
-                        st.warning("No matching DSR items found. Please enter code manually.")
+                        st.warning("No matching DSR items found. Refine the keyword or check DSR CSV.")
                     else:
-                        st.write("Suggested DSR items from DSR CSV:")
+                        st.write(f"Suggested DSR items for '{keyword}':")
                         st.dataframe(matches, use_container_width=True)
 
                 st.info(
@@ -377,6 +379,8 @@ with tab_boq:
                     wbs_level2=wbs_l2,
                     is_reference=item.is_code_ref,
                 )
+
+        # (Keep the rest of the BOQ tab: Generate BOQ, section totals, contingency, Excel download)
 
         col1, col2 = st.columns(2)
         with col1:
