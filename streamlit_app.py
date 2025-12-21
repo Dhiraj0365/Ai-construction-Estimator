@@ -51,7 +51,7 @@ dsr_year = st.sidebar.text_input(
 
 st.title("🧮 AI Construction Estimator")
 st.caption(
-    "Quantity Take-Off (QTO), Rate Analysis, and BOQ as per IS 1200 with DSR mapping and Cost Index."
+    "Quantity Take-Off (QTO), Rate Analysis, and BOQ as per IS 1200 with DSR mapping, Cost Index, and detailed rate analysis."
 )
 
 tab_qto, tab_rate, tab_boq = st.tabs(
@@ -208,7 +208,7 @@ with tab_rate:
             f"Found {len(st.session_state.qto_items)} measured items. Enter or confirm rates below."
         )
 
-                rate_items = []
+        rate_items = []
         for idx, item in enumerate(st.session_state.qto_items, start=1):
             with st.expander(
                 f"Item {idx}: {item.description} ({item.quantity:.2f} {item.unit})",
