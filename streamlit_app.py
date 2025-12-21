@@ -208,7 +208,7 @@ with tab_rate:
             f"Found {len(st.session_state.qto_items)} measured items. Enter or confirm rates below."
         )
 
-        rate_items = []
+                rate_items = []
         for idx, item in enumerate(st.session_state.qto_items, start=1):
             with st.expander(
                 f"Item {idx}: {item.description} ({item.quantity:.2f} {item.unit})",
@@ -238,13 +238,81 @@ with tab_rate:
 
                 default_rate = base_rate * (cost_index / 100.0)
 
+                st.markdown("#### Unit Rate")
                 rate_value = st.number_input(
                     f"Rate (₹/{item.unit})",
                     min_value=0.0,
                     value=default_rate,
                     key=f"rate_{idx}",
-                    help="Enter unit rate as per latest DSR / PWD schedule",
+                    help="Enter unit rate as per latest DSR / PWD schedule or from detailed rate analysis below.",
                 )
+
+                show_detail = st.checkbox(
+                    "Show detailed rate analysis (materials + labour)",
+                    value=False,
+                    key=f"show_detail_{idx}",
+                )
+
+                if show_detail:
+                    st.markdown("##### Materials per unit of work")
+                    mat_df_default = pd.DataFrame(
+                        [
+                            {"Resource": "Cement", "Qty per unit": 0.0, "Unit": "bag", "Rate": 0.0},
+                            {"Resource": "Sand", "Qty per unit": 0.0, "Unit": "Cum", "Rate": 0.0},
+                            {"Resource": "Aggregate", "Qty per unit": 0.0, "Unit": "Cum", "Rate": 0.0},
+                        ]
+                    )
+                    mat_df = st.data_editor(
+                        mat_df_default,
+                        num_rows="dynamic",
+                        key=f"mat_editor_{idx}",
+                        use_container_width=True,
+                    )
+                    mat_cost = float((mat_df["Qty per unit"] * mat_df["Rate"]).sum())
+
+                    st.markdown("##### Labour per unit of work")
+                    lab_df_default = pd.DataFrame(
+                        [
+                            {"Category": "Mason", "Hrs per unit": 0.0, "Wage/hr": 0.0},
+                            {"Category": "Helper", "Hrs per unit": 0.0, "Wage/hr": 0.0},
+                        ]
+                    )
+                    lab_df = st.data_editor(
+                        lab_df_default,
+                        num_rows="dynamic",
+                        key=f"lab_editor_{idx}",
+                        use_container_width=True,
+                    )
+                    lab_cost = float((lab_df["Hrs per unit"] * lab_df["Wage/hr"]).sum())
+
+                    direct_cost = mat_cost + lab_cost
+                    st.write(f"Direct cost (Material + Labour) per {item.unit}: ₹{direct_cost:,.2f}")
+
+                    oh_pct_detail = st.number_input(
+                        "Overheads for this item (%)",
+                        min_value=0.0,
+                        value=10.0,
+                        step=1.0,
+                        key=f"oh_detail_{idx}",
+                    )
+                    profit_pct_detail = st.number_input(
+                        "Profit for this item (%)",
+                        min_value=0.0,
+                        value=10.0,
+                        step=1.0,
+                        key=f"profit_detail_{idx}",
+                    )
+
+                    oh_amt_detail = direct_cost * oh_pct_detail / 100.0
+                    profit_amt_detail = (direct_cost + oh_amt_detail) * profit_pct_detail / 100.0
+                    suggested_rate = direct_cost + oh_amt_detail + profit_amt_detail
+
+                    st.write(f"Suggested unit rate from detailed analysis: ₹{suggested_rate:,.2f}")
+
+                    if st.button("Use suggested rate above", key=f"use_suggested_{idx}"):
+                        rate_value = suggested_rate
+                        st.session_state[f"rate_{idx}"] = suggested_rate
+                        st.success("Unit rate updated from detailed analysis.")
 
                 breakdown = rate_analyzer.simple_breakdown(rate_value)
 
