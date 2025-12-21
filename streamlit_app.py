@@ -98,7 +98,7 @@ with tab_qto:
             help="For reinforcement (direct kg), treat this as total weight in kg.",
         )
 
-    # ---------------- EARTHWORK EXTRAS ----------------
+    # ============== EARTHWORK EXTRAS ==============
     lead = st.number_input("Lead (m) (for earthwork)", min_value=0.0, value=50.0)
 
     soil_type = "ordinary"
@@ -119,24 +119,21 @@ with tab_qto:
                     "hard rock (blasting prohibited)",
                 ],
                 index=0,
-                help="Classify soil as per DSR / project specifications.",
             )
         with col_ew2:
             depth_band = st.selectbox(
                 "Depth range",
                 ["up to 1.5 m", "1.5 m to 3.0 m", "3.0 m to 4.5 m", "exceeding 4.5 m"],
                 index=0,
-                help="Lift band for excavation as per IS 1200 & DSR.",
             )
         with col_ew3:
             lead_band = st.selectbox(
                 "Lead range",
                 ["up to 50 m", "50 m to 250 m", "250 m to 500 m", "exceeding 500 m"],
                 index=0,
-                help="Horizontal lead band for disposal of excavated earth.",
             )
 
-    # ---------------- MASONRY EXTRAS ----------------
+    # ============== MASONRY EXTRAS ==============
     n_small_openings = 0
     area_small_each = 0.0
     n_large_openings = 0
@@ -158,7 +155,6 @@ with tab_qto:
                 min_value=0.0,
                 value=0.05,
                 step=0.01,
-                help="No deduction will be made for these, but recorded for info.",
             )
         with col_m3:
             n_large_openings = st.number_input(
@@ -173,10 +169,9 @@ with tab_qto:
                 min_value=0.0,
                 value=1.0,
                 step=0.05,
-                help="These openings will be deducted from masonry volume.",
             )
 
-    # ---------------- PLASTER EXTRAS ----------------
+    # ============== PLASTER EXTRAS ==============
     plaster_faces = 1
     p_n_small_openings = 0
     p_area_small_each = 0.0
@@ -191,7 +186,6 @@ with tab_qto:
                 "Number of faces plastered",
                 [1, 2],
                 index=1,
-                help="1 = single side plaster; 2 = both sides of wall.",
             )
         with col_p1:
             p_n_small_openings = st.number_input(
@@ -206,7 +200,6 @@ with tab_qto:
                 min_value=0.0,
                 value=0.25,
                 step=0.01,
-                help="Openings ≤ 0.5 m²; no deduction will be made.",
             )
 
         col_p3, col_p4 = st.columns(2)
@@ -223,10 +216,9 @@ with tab_qto:
                 min_value=0.0,
                 value=1.0,
                 step=0.05,
-                help="These openings will be deducted from plaster area.",
             )
 
-    # ---------------- PAINTING EXTRAS ----------------
+    # ============== PAINTING EXTRAS ==============
     paint_faces = 1
     paint_coats = 2
     paint_type = "acrylic"
@@ -243,7 +235,6 @@ with tab_qto:
                 "Number of faces painted",
                 [1, 2],
                 index=1,
-                help="1 = single side; 2 = both sides.",
             )
         with col_pa2:
             paint_coats = st.number_input(
@@ -251,7 +242,6 @@ with tab_qto:
                 min_value=1,
                 value=2,
                 step=1,
-                help="Affects rate, not quantity.",
             )
         with col_pa3:
             paint_type = st.selectbox(
@@ -273,7 +263,6 @@ with tab_qto:
                 min_value=0.0,
                 value=0.25,
                 step=0.01,
-                help="No deduction for these.",
             )
 
         col_pb3, col_pb4 = st.columns(2)
@@ -290,10 +279,9 @@ with tab_qto:
                 min_value=0.0,
                 value=1.0,
                 step=0.05,
-                help="These will be deducted.",
             )
 
-    # ---------------- FLOORING EXTRAS ----------------
+    # ============== FLOORING EXTRAS ==============
     f_n_small_openings = 0
     f_area_small_each = 0.0
     f_n_large_openings = 0
@@ -315,7 +303,6 @@ with tab_qto:
                 min_value=10.0,
                 value=20.0,
                 step=5.0,
-                help="For description and rate; quantity is in Sqm.",
             )
 
         col_f1a, col_f2a = st.columns(2)
@@ -332,7 +319,6 @@ with tab_qto:
                 min_value=0.0,
                 value=0.05,
                 step=0.01,
-                help="No deduction for these.",
             )
 
         col_f3a, col_f4a = st.columns(2)
@@ -349,16 +335,14 @@ with tab_qto:
                 min_value=0.0,
                 value=0.5,
                 step=0.05,
-                help="These will be deducted from floor area.",
             )
 
-    # ---------------- FORMWORK EXTRAS ----------------
+    # ============== FORMWORK EXTRAS ==============
     formwork_member_type = "slab"
     if "Formwork" in qto_type:
         formwork_member_type = st.selectbox(
             "Formwork for",
             ["slab", "beam", "column", "footing"],
-            help="Formwork measured on concrete contact area as per IS 1200 Part 5.",
         )
 
     # =================== ADD ITEM BUTTON ===================
@@ -420,7 +404,6 @@ with tab_qto:
                 )
 
             elif "Brick Masonry" in qto_type:
-                # length = wall length, depth_or_thk = wall height, width = thickness
                 item = engine.measure_masonry(
                     length=length,
                     height=depth_or_thk,
@@ -471,7 +454,6 @@ with tab_qto:
                 )
 
             elif "Reinforcement Steel (from RCC volume)" in qto_type:
-                # here we treat geometry as a slab by default for simplicity
                 rcc_item = engine.measure_rcc_member(
                     member_type="slab",
                     length=length,
@@ -551,7 +533,7 @@ with tab_rate:
                 desc_lower = item.description.lower()
                 if "earthwork" in desc_lower or "excavation" in desc_lower:
                     base_rate = 260.0
-                elif "pcc" in desc_lower or "plain" in desc_lower and "concrete" in desc_lower:
+                elif "pcc" in desc_lower or ("plain" in desc_lower and "concrete" in desc_lower):
                     base_rate = 4500.0
                 elif "rcc" in desc_lower:
                     base_rate = 7500.0
@@ -563,8 +545,8 @@ with tab_rate:
                     base_rate = 800.0
                 elif "formwork" in desc_lower:
                     base_rate = 900.0
-                elif "reinforcement steel" in desc_lower:
-                    base_rate = 80.0  # ₹/kg
+                elif "reinforcement" in desc_lower:
+                    base_rate = 80.0
                 elif "paint" in desc_lower or "finishing" in desc_lower:
                     base_rate = 120.0
                 else:
@@ -711,7 +693,7 @@ with tab_boq:
                             else "Formwork"
                             if "formwork" in desc_lower
                             else "Reinforcement"
-                            if "reinforcement steel" in desc_lower
+                            if "reinforcement" in desc_lower
                             else "Finishes"
                         ),
                         key=f"wbs1_{idx}",
@@ -720,7 +702,7 @@ with tab_boq:
                         "DSR description keyword (optional)",
                         value="",
                         key=f"dsr_kw_{idx}",
-                        help="Type a phrase to search DSR, e.g. 'earthwork excavation', 'PCC 1:4:8', 'M25 slab', '12 mm plaster', 'vitrified tiles'.",
+                        help="Type a phrase to search DSR.",
                     )
 
                     rate_source = st.selectbox(
@@ -728,7 +710,6 @@ with tab_boq:
                         ["DSR", "Market", "Client", "Assumed"],
                         index=0,
                         key=f"rate_source_{idx}",
-                        help="DSR = schedule rate, Market = vendor/market rate, Client = client-specified, Assumed = your own assumption.",
                     )
 
                 with col2:
@@ -740,13 +721,13 @@ with tab_boq:
                             else "Structural concrete"
                             if "rcc" in desc_lower
                             else "PCC"
-                            if "plain cement concrete" in desc_lower
+                            if "pcc" in desc_lower or "plain" in desc_lower
                             else "Wall masonry"
                             if "masonry" in desc_lower
                             else "Shuttering"
                             if "formwork" in desc_lower
                             else "Reinforcement"
-                            if "reinforcement steel" in desc_lower
+                            if "reinforcement" in desc_lower
                             else "Painting"
                             if "paint" in desc_lower or "finishing" in desc_lower
                             else "Flooring"
@@ -758,30 +739,30 @@ with tab_boq:
                         "Note / Justification (optional)",
                         value="",
                         key=f"note_{idx}",
-                        help="Example: 'Rate as per vendor quote dated 20-12-2025' or 'Client supplied rate'.",
+                        help="Example: 'Rate as per vendor quote dated 20-12-2025'.",
                     )
 
                 # Keyword-based DSR suggestion
                 if st.button("🔎 Suggest DSR items (keyword)", key=f"suggest_dsr_{idx}"):
                     keyword = dsr_keyword.strip()
                     if not keyword:
-                        if "earthwork" in desc_lower or "excavation" in desc_lower:
+                        if "earthwork" in desc_lower:
                             keyword = "earth"
-                        elif "plain cement concrete" in desc_lower or "pcc" in desc_lower:
-                            keyword = "plain cement concrete"
-                        elif "reinforced cement concrete" in desc_lower or "rcc" in desc_lower:
-                            keyword = "reinforced cement concrete"
+                        elif "pcc" in desc_lower:
+                            keyword = "plain concrete"
+                        elif "rcc" in desc_lower:
+                            keyword = "reinforced concrete"
                         elif "masonry" in desc_lower:
                             keyword = "masonry"
                         elif "plaster" in desc_lower:
                             keyword = "plaster"
-                        elif "floor" in desc_lower or "tile" in desc_lower:
+                        elif "floor" in desc_lower:
                             keyword = "floor"
                         elif "formwork" in desc_lower:
                             keyword = "formwork"
-                        elif "reinforcement steel" in desc_lower or "tmt" in desc_lower:
+                        elif "reinforcement" in desc_lower:
                             keyword = "reinforcement"
-                        elif "paint" in desc_lower or "finishing" in desc_lower:
+                        elif "paint" in desc_lower:
                             keyword = "paint"
 
                     if keyword:
@@ -790,7 +771,7 @@ with tab_boq:
                         matches = dsr_parser.get_all_items()
 
                     if matches.empty:
-                        st.warning("No matching DSR items found. Refine the keyword or check DSR CSV.")
+                        st.warning("No matching DSR items found.")
                     else:
                         st.write(f"Suggested DSR items for '{keyword}':")
                         st.dataframe(matches, use_container_width=True)
@@ -806,7 +787,7 @@ with tab_boq:
                             top_n=5,
                         )
                     if not ai_results:
-                        st.warning("AI could not find suitable DSR suggestions. Please use keyword search or enter manually.")
+                        st.warning("AI could not find suitable DSR suggestions.")
                     else:
                         st.write("AI-suggested DSR items (please verify before use):")
                         ai_df = pd.DataFrame(ai_results)
@@ -907,5 +888,5 @@ with tab_boq:
 
 st.markdown("---")
 st.markdown(
-    "*Based on IS 1200 measurement standards. Verify IS clauses, DSR codes, Cost Index, AI suggestions, and all rates/percentages with latest CPWD/State rules before tender use.*"
+    "*Based on IS 1200 measurement standards. Verify IS clauses, DSR codes, Cost Index, AI suggestions, and all rates with latest CPWD/State rules before tender use.*"
 )
