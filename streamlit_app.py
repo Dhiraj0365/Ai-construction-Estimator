@@ -46,7 +46,7 @@ cost_index = st.sidebar.number_input(
 dsr_year = st.sidebar.text_input(
     "DSR Year / Source",
     value="DSR 2023",
-    help="Reference only; use to note which DSR/SOR the base rates are from.",
+    help="Reference only; note which DSR/SOR the base rates are from.",
 )
 
 st.title("🧮 AI Construction Estimator")
@@ -323,6 +323,14 @@ with tab_boq:
                         help="Type a phrase to search DSR, e.g. 'earthwork excavation', 'PCC 1:4:8', 'M25 slab', '12 mm plaster', 'vitrified tiles'.",
                     )
 
+                    rate_source = st.selectbox(
+                        "Rate Source",
+                        ["DSR", "Market", "Client", "Assumed"],
+                        index=0,
+                        key=f"rate_source_{idx}",
+                        help="DSR = schedule rate, Market = vendor/market rate, Client = client-specified, Assumed = your own assumption.",
+                    )
+
                 with col2:
                     wbs_l2 = st.text_input(
                         "WBS Level 2",
@@ -344,6 +352,13 @@ with tab_boq:
                             else "Flooring"
                         ),
                         key=f"wbs2_{idx}",
+                    )
+
+                    item_note = st.text_area(
+                        "Note / Justification (optional)",
+                        value="",
+                        key=f"note_{idx}",
+                        help="Example: 'Rate as per vendor quote dated 20-12-2025' or 'Client supplied rate'.",
                     )
 
                 if st.button("🔎 Suggest DSR items", key=f"suggest_dsr_{idx}"):
@@ -393,6 +408,8 @@ with tab_boq:
                     wbs_level1=wbs_l1,
                     wbs_level2=wbs_l2,
                     is_reference=item.is_code_ref,
+                    rate_source=rate_source,
+                    note=item_note,
                 )
 
         col1, col2 = st.columns(2)
