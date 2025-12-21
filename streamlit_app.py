@@ -5,6 +5,7 @@ from is1200_rules import IS1200Engine, MeasurementItem
 from rate_analyzer import RateAnalyzer
 from boq_generator import BOQGenerator
 from dsr_parser import DSRParser
+from ai_helpers import AISuggester
 
 
 # ---------- SESSION STATE INITIALIZATION ----------
@@ -26,6 +27,7 @@ engine = IS1200Engine()
 rate_analyzer = RateAnalyzer()
 dsr_parser = DSRParser()
 boq_gen = BOQGenerator()
+ai_suggester = AISuggester()
 
 # Sidebar: Project info
 st.sidebar.header("Project Details")
@@ -51,7 +53,7 @@ dsr_year = st.sidebar.text_input(
 
 st.title("🧮 AI Construction Estimator")
 st.caption(
-    "Quantity Take-Off (QTO), Rate Analysis, and BOQ as per IS 1200 with DSR mapping, Cost Index, and detailed rate analysis."
+    "Quantity Take-Off (QTO), Rate Analysis, and BOQ as per IS 1200 with DSR mapping, Cost Index, detailed rate analysis, and AI-assisted DSR suggestions."
 )
 
 tab_qto, tab_rate, tab_boq = st.tabs(
@@ -429,7 +431,8 @@ with tab_boq:
                         help="Example: 'Rate as per vendor quote dated 20-12-2025' or 'Client supplied rate'.",
                     )
 
-                if st.button("🔎 Suggest DSR items", key=f"suggest_dsr_{idx}"):
+                # Keyword-based DSR suggestion
+                if st.button("🔎 Suggest DSR items (keyword)", key=f"suggest_dsr_{idx}"):
                     keyword = dsr_keyword.strip()
                     if not keyword:
                         if "earthwork" in desc_lower or "excavation" in desc_lower:
@@ -461,6 +464,23 @@ with tab_boq:
                     else:
                         st.write(f"Suggested DSR items for '{keyword}':")
                         st.dataframe(matches, use_container_width=True)
+
+                # AI-based DSR suggestion
+                if st.button("🤖 Ask AI for DSR suggestions", key=f"ai_dsr_{idx}"):
+                    dsr_df = dsr_parser.get_all_items()
+                    with st.spinner("Asking AI to suggest closest DSR items..."):
+                        ai_results = ai_suggester.suggest_dsr_items(
+                            boq_description=item.description,
+                            unit=item.unit,
+                            dsr_df=dsr_df,
+                            top_n=5,
+                        )
+                    if not ai_results:
+                        st.warning("AI could not find suitable DSR suggestions. Please use keyword search or enter manually.")
+                    else:
+                        st.write("AI-suggested DSR items (please verify before use):")
+                        ai_df = pd.DataFrame(ai_results)
+                        st.dataframe(ai_df, use_container_width=True)
 
                 st.info(
                     f"Rate: ₹{info['rate']:.2f}/{item.unit} | Amount: ₹{info['amount']:,.2f}"
@@ -557,5 +577,5 @@ with tab_boq:
 
 st.markdown("---")
 st.markdown(
-    "*Based on IS 1200 measurement standards. Verify DSR codes, cost index, rates and percentages with latest CPWD/State rules before tender use.*"
+    "*Based on IS 1200 measurement standards. Verify DSR codes, cost index, AI suggestions, rates and percentages with latest CPWD/State rules before tender use.*"
 )
