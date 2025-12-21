@@ -36,9 +36,22 @@ project_duration = st.sidebar.number_input(
 )
 risk_level = st.sidebar.selectbox("Risk Level", ["Low", "Medium", "High"])
 
+cost_index = st.sidebar.number_input(
+    "Cost Index (%)",
+    min_value=50.0,
+    value=100.0,
+    step=1.0,
+    help="Enter building cost index for this location (e.g., 107 for DSR 2023 Delhi).",
+)
+dsr_year = st.sidebar.text_input(
+    "DSR Year / Source",
+    value="DSR 2023",
+    help="Reference only; use to note which DSR/SOR the base rates are from.",
+)
+
 st.title("🧮 AI Construction Estimator")
 st.caption(
-    "Quantity Take-Off (QTO), Rate Analysis, and BOQ as per IS 1200 with basic DSR mapping."
+    "Quantity Take-Off (QTO), Rate Analysis, and BOQ as per IS 1200 with DSR mapping and Cost Index."
 )
 
 tab_qto, tab_rate, tab_boq = st.tabs(
@@ -72,8 +85,10 @@ with tab_qto:
         width = st.number_input("Width (m)", min_value=0.1, value=5.0)
     with col3:
         depth_or_thk = st.number_input(
-            "Depth / Thickness / Height (m or kg*)", min_value=0.05, value=1.2,
-            help="For reinforcement, treat this as total weight in kg for now."
+            "Depth / Thickness / Height (m or kg*)",
+            min_value=0.05,
+            value=1.2,
+            help="For reinforcement, treat this as total weight in kg for now.",
         )
 
     lead = st.number_input("Lead (m) (for earthwork)", min_value=0.0, value=50.0)
@@ -130,7 +145,6 @@ with tab_qto:
                 )
 
             elif "Formwork" in qto_type:
-                # Approximate vertical shuttering area as L x H
                 form_area = length * depth_or_thk
                 item = engine.measure_formwork(
                     area=form_area,
@@ -138,14 +152,12 @@ with tab_qto:
                 )
 
             elif "Reinforcement Steel" in qto_type:
-                # Interpret depth_or_thk as total reinforcement weight in kg
                 item = engine.measure_reinforcement(
                     weight_kg=depth_or_thk,
                     bar_type="TMT",
                 )
 
             elif "Painting / Finishing" in qto_type:
-                # Approximate wall area as L x H
                 paint_area = length * depth_or_thk
                 item = engine.measure_painting(
                     area=paint_area,
@@ -204,25 +216,27 @@ with tab_rate:
             ):
                 desc_lower = item.description.lower()
                 if "earthwork" in desc_lower or "excavation" in desc_lower:
-                    default_rate = 260.0
+                    base_rate = 260.0
                 elif any(x in desc_lower for x in ["plain cement concrete", "pcc"]):
-                    default_rate = 4500.0
+                    base_rate = 4500.0
                 elif any(x in desc_lower for x in ["reinforced cement concrete", "rcc"]):
-                    default_rate = 7500.0
+                    base_rate = 7500.0
                 elif "masonry" in desc_lower:
-                    default_rate = 5500.0
+                    base_rate = 5500.0
                 elif "plaster" in desc_lower:
-                    default_rate = 250.0
+                    base_rate = 250.0
                 elif "floor" in desc_lower or "tile" in desc_lower:
-                    default_rate = 800.0
+                    base_rate = 800.0
                 elif "formwork" in desc_lower:
-                    default_rate = 900.0
+                    base_rate = 900.0
                 elif "reinforcement steel" in desc_lower:
-                    default_rate = 80.0  # ₹/kg
+                    base_rate = 80.0  # ₹/kg
                 elif "painting" in desc_lower or "finishing" in desc_lower:
-                    default_rate = 120.0
+                    base_rate = 120.0
                 else:
-                    default_rate = 1000.0
+                    base_rate = 1000.0
+
+                default_rate = base_rate * (cost_index / 100.0)
 
                 rate_value = st.number_input(
                     f"Rate (₹/{item.unit})",
@@ -262,6 +276,7 @@ with tab_rate:
 # ============================= TAB 3: BOQ =============================
 with tab_boq:
     st.subheader("Bill of Quantities (BOQ)")
+    st.caption(f"Using cost index: {cost_index:.2f}% based on {dsr_year}")
 
     if not st.session_state.rate_items:
         st.info("💰 No rate analysis found. Please complete the **Rate Analysis** tab first.")
@@ -288,7 +303,9 @@ with tab_boq:
                             "Earthwork"
                             if "earthwork" in desc_lower or "excavation" in desc_lower
                             else "Concrete"
-                            if "concrete" in desc_lower or "rcc" in desc_lower or "pcc" in desc_lower
+                            if "concrete" in desc_lower
+                            or "rcc" in desc_lower
+                            or "pcc" in desc_lower
                             else "Masonry"
                             if "masonry" in desc_lower
                             else "Formwork"
@@ -303,7 +320,7 @@ with tab_boq:
                         "DSR description keyword (optional)",
                         value="",
                         key=f"dsr_kw_{idx}",
-                        help="Type a word/phrase to search DSR, e.g. 'earthwork excavation', 'PCC 1:4:8', 'M25 slab', '12 mm plaster', 'vitrified tiles'.",
+                        help="Type a phrase to search DSR, e.g. 'earthwork excavation', 'PCC 1:4:8', 'M25 slab', '12 mm plaster', 'vitrified tiles'.",
                     )
 
                 with col2:
@@ -329,13 +346,11 @@ with tab_boq:
                         key=f"wbs2_{idx}",
                     )
 
-                # Suggest DSR items based on keyword or auto keyword from description
                 if st.button("🔎 Suggest DSR items", key=f"suggest_dsr_{idx}"):
-                    # If user typed a keyword, use it; otherwise infer from description
                     keyword = dsr_keyword.strip()
                     if not keyword:
                         if "earthwork" in desc_lower or "excavation" in desc_lower:
-                            keyword = "earth work"
+                            keyword = "earth"
                         elif "plain cement concrete" in desc_lower or "pcc" in desc_lower:
                             keyword = "plain cement concrete"
                         elif "reinforced cement concrete" in desc_lower or "rcc" in desc_lower:
@@ -380,8 +395,6 @@ with tab_boq:
                     is_reference=item.is_code_ref,
                 )
 
-        # (Keep the rest of the BOQ tab: Generate BOQ, section totals, contingency, Excel download)
-
         col1, col2 = st.columns(2)
         with col1:
             if st.button("📊 Generate BOQ Table", use_container_width=True):
@@ -396,7 +409,6 @@ with tab_boq:
             st.markdown("### 📋 Final BOQ")
             st.dataframe(df_boq, use_container_width=True)
 
-            # Section-wise totals by WBS Level 1
             st.markdown("### 📊 Section-wise totals (by WBS Level 1)")
             section_totals = (
                 df_boq.groupby("WBS Level 1")["Amount (₹)"]
@@ -405,7 +417,6 @@ with tab_boq:
             )
             st.dataframe(section_totals, use_container_width=True)
 
-            # Base total
             base_total = df_boq["Amount (₹)"].sum()
             st.metric("💎 BASE TOTAL", f"₹{base_total:,.0f}")
 
@@ -440,7 +451,6 @@ with tab_boq:
             st.write(f"GST ({gst_pct:.1f}%): ₹{gst_amt:,.0f}")
             st.metric("🔹 SANCTION ESTIMATE TOTAL", f"₹{final_total:,.0f}")
 
-            # Download BOQ + Abstract as Excel
             excel_bytes = boq_gen.to_excel_bytes(
                 df_boq,
                 section_totals=section_totals,
@@ -449,6 +459,8 @@ with tab_boq:
                 overhead_pct=overhead_pct,
                 profit_pct=profit_pct,
                 gst_pct=gst_pct,
+                cost_index=cost_index,
+                dsr_year=dsr_year,
             )
             st.download_button(
                 label="⬇️ Download BOQ + Abstract (Excel)",
@@ -460,5 +472,5 @@ with tab_boq:
 
 st.markdown("---")
 st.markdown(
-    "*Based on IS 1200 measurement standards. Verify DSR codes, rates and percentages with latest CPWD/State rules before tender use.*"
+    "*Based on IS 1200 measurement standards. Verify DSR codes, cost index, rates and percentages with latest CPWD/State rules before tender use.*"
 )
