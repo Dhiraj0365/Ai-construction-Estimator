@@ -15,6 +15,8 @@ class BOQItem:
     wbs_level1: str
     wbs_level2: str
     is_reference: str
+    rate_source: str
+    note: str
 
 
 class BOQGenerator:
@@ -35,6 +37,8 @@ class BOQGenerator:
         wbs_level1: str,
         wbs_level2: str,
         is_reference: str,
+        rate_source: str,
+        note: str,
     ) -> None:
         self.items.append(
             BOQItem(
@@ -47,6 +51,8 @@ class BOQGenerator:
                 wbs_level1=wbs_level1,
                 wbs_level2=wbs_level2,
                 is_reference=is_reference,
+                rate_source=rate_source,
+                note=note,
             )
         )
 
@@ -62,6 +68,8 @@ class BOQGenerator:
                 "WBS Level 1": it.wbs_level1,
                 "WBS Level 2": it.wbs_level2,
                 "IS Reference": it.is_reference,
+                "Rate Source": it.rate_source,
+                "Note": it.note,
             }
             for it in self.items
         ]
