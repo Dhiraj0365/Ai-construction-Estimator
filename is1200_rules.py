@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class MeasurementItem:
+    """Data class for a single measured item."""
     description: str
     quantity: float
     unit: str
@@ -11,20 +12,20 @@ class MeasurementItem:
 
 class IS1200Engine:
     """
-    Measurement helper implementing simplified IS 1200 rules for:
-    - Earthwork
-    - PCC / RCC
-    - Reinforcement
-    - Masonry
-    - Plastering
-    - Painting
-    - Flooring
-    - Formwork
+    Complete IS 1200 measurement engine for:
+    - Earthwork Excavation (Part 1 & 2)
+    - Concrete (PCC / RCC members) (Part 2)
+    - Reinforcement Steel (Part 8)
+    - Brick Masonry (Part 3)
+    - Plastering (Part 12)
+    - Flooring (Part 11)
+    - Formwork (Part 5)
+    - Painting (Part 13)
     """
 
-    # -----------------------------
-    # 1. Earthwork Excavation
-    # -----------------------------
+    # ============================================================
+    # 1. EARTHWORK EXCAVATION (IS 1200 Part 1 & 2)
+    # ============================================================
     def measure_earthwork(
         self,
         length: float,
@@ -37,9 +38,9 @@ class IS1200Engine:
         """
         Earthwork in excavation as per IS 1200 Part 1 & 2.
 
-        - Quantity = net excavated volume (L x B x D)
-        - Separate items for different soil type, depth range, lead range
-        - No deduction for PCC volume, slips, or working space
+        Quantity = net excavated volume (L x B x D in m³)
+        Separate items for: soil type, depth range, lead range
+        No deduction: PCC volume, slips, working space
         """
         volume = length * width * depth
 
@@ -55,9 +56,9 @@ class IS1200Engine:
             is_code_ref="IS 1200 Part 1 & 2",
         )
 
-    # -----------------------------
-    # 2. Concrete (generic PCC / RCC)
-    # -----------------------------
+    # ============================================================
+    # 2. CONCRETE (Generic PCC / RCC)
+    # ============================================================
     def measure_concrete(
         self,
         length: float,
@@ -68,8 +69,7 @@ class IS1200Engine:
     ) -> MeasurementItem:
         """
         Generic concrete volume = L x B x T (m³).
-        Used mainly for PCC or simple RCC elements when detailed member
-        functions are not used.
+        Used for PCC or simple RCC elements.
         """
         volume = length * width * thickness
         desc = f"{grade} {element_type} concrete {length:.2f} m x {width:.2f} m x {thickness:.3f} m"
@@ -81,9 +81,9 @@ class IS1200Engine:
             is_code_ref="IS 1200 Part 2",
         )
 
-    # -----------------------------
-    # 3. RCC members (slab / beam / column / footing)
-    # -----------------------------
+    # ============================================================
+    # 3. RCC MEMBERS (SLAB / BEAM / COLUMN / FOOTING)
+    # ============================================================
     def measure_rcc_member(
         self,
         member_type: str,
@@ -93,14 +93,14 @@ class IS1200Engine:
         grade: str = "M25",
     ) -> MeasurementItem:
         """
-        RCC concrete quantity by member type as per IS 1200 Part 2 & IS 456.
+        RCC concrete quantity by member type (IS 1200 Part 2 & IS 456).
 
         Slab:   L x B x T
         Beam:   L x B x D
         Column: L x B x H
         Footing:L x B x D
         """
-        mt = member_type.lower()
+        mt = member_type.lower().strip()
 
         if mt == "slab":
             volume = length * width * depth_or_height
@@ -116,7 +116,7 @@ class IS1200Engine:
             desc = f"RCC {grade} footing {length:.2f} m x {width:.2f} m x {depth_or_height:.3f} m"
         else:
             volume = length * width * depth_or_height
-            desc = f"RCC {grade} member ({member_type})"
+            desc = f"RCC {grade} {member_type}"
 
         return MeasurementItem(
             description=desc,
@@ -125,17 +125,15 @@ class IS1200Engine:
             is_code_ref="IS 1200 Part 2, IS 456",
         )
 
-    # -----------------------------
-    # 4. Reinforcement – direct kg
-    # -----------------------------
+    # ============================================================
+    # 4. REINFORCEMENT STEEL (Direct kg)
+    # ============================================================
     def measure_reinforcement(
         self,
         weight_kg: float,
         bar_type: str = "TMT",
     ) -> MeasurementItem:
-        """
-        Direct reinforcement measurement in kg (from BBS or site data).
-        """
+        """Direct reinforcement measurement from BBS or site data (kg)."""
         desc = f"Reinforcement steel ({bar_type})"
 
         return MeasurementItem(
@@ -145,24 +143,24 @@ class IS1200Engine:
             is_code_ref="IS 1200 Part 8",
         )
 
-    # -----------------------------
-    # 5. Reinforcement – from RCC volume (thumb rules)
-    # -----------------------------
+    # ============================================================
+    # 5. REINFORCEMENT STEEL (From RCC Volume – Thumb Rules)
+    # ============================================================
     def estimate_reinforcement_from_rcc(
         self,
         member_type: str,
         concrete_volume: float,
     ) -> MeasurementItem:
         """
-        Quick steel estimate using typical kg/m³ ranges:
+        Quick steel estimate using typical kg/m³ thumb rules:
         - Slab:   ~80 kg/m³
         - Beam:   ~120 kg/m³
         - Column: ~140 kg/m³
         - Footing:~80 kg/m³
 
-        For preliminary estimates only; replace with BBS for final.
+        For preliminary estimates; replace with BBS for final.
         """
-        mt = member_type.lower()
+        mt = member_type.lower().strip()
         if mt == "slab":
             density = 80.0
         elif mt == "beam":
@@ -184,9 +182,9 @@ class IS1200Engine:
             is_code_ref="IS 1200 Part 8 (thumb rule)",
         )
 
-    # -----------------------------
-    # 6. Masonry (with openings)
-    # -----------------------------
+    # ============================================================
+    # 6. BRICK MASONRY (With Openings)
+    # ============================================================
     def measure_masonry(
         self,
         length: float,
@@ -201,9 +199,9 @@ class IS1200Engine:
         """
         Masonry measurement as per IS 1200 Part 3.
 
-        - Gross volume = L x H x T
-        - Deduct only openings > 0.1 m²
-        - Openings ≤ 0.1 m² and small beam/column ends are not deducted.
+        Gross volume = L x H x T
+        Deduct only openings > 0.1 m²
+        Do not deduct openings ≤ 0.1 m² or small beam/column ends
         """
         volume_gross = length * height * thickness
 
@@ -242,9 +240,9 @@ class IS1200Engine:
             is_code_ref="IS 1200 Part 3",
         )
 
-    # -----------------------------
-    # 7. Plastering (with openings)
-    # -----------------------------
+    # ============================================================
+    # 7. PLASTERING (With Openings)
+    # ============================================================
     def measure_plaster(
         self,
         length: float,
@@ -259,14 +257,14 @@ class IS1200Engine:
         """
         Plaster measurement as per IS 1200 Part 12.
 
-        - Base area per face = L x H
-        - No deduction for openings ≤ 0.5 m²
-        - Deduct openings > 0.5 m²
-        - Thickness not used for quantity, only for description/rate.
+        Base area per face = L x H (Sqm)
+        No deduction for openings ≤ 0.5 m²
+        Deduct openings > 0.5 m²
+        Thickness for description/rate only; quantity in Sqm
         """
         base_area_one_face = length * height
 
-        # Small openings (≤ 0.5 m²) – no deduction, just info
+        # Small openings (≤ 0.5 m²) – no deduction, info only
         small_opening_area_total = n_small_openings * area_small_each
 
         # Large openings (> 0.5 m²) – deduct
@@ -302,70 +300,9 @@ class IS1200Engine:
             is_code_ref="IS 1200 Part 12",
         )
 
-    # -----------------------------
-    # 8. Painting (with openings)
-    # -----------------------------
-    def measure_painting(
-        self,
-        length: float,
-        height: float,
-        face_count: int = 1,
-        n_small_openings: int = 0,
-        area_small_each: float = 0.0,
-        n_large_openings: int = 0,
-        area_large_each: float = 0.0,
-        coats: int = 2,
-        paint_type: str = "acrylic",
-    ) -> MeasurementItem:
-        """
-        Painting measurement as per IS 1200 Part 13.
-
-        - Same area rules as plaster (deduct only openings > 0.5 m²)
-        - Quantity = net surface area in Sqm
-        - Coats and type in description only.
-        """
-        base_area_one_face = length * height
-
-        # Small openings (≤ 0.5 m²) – no deduction
-        small_opening_area_total = n_small_openings * area_small_each
-
-        # Large openings (> 0.5 m²) – deduct
-        large_opening_area_total = n_large_openings * area_large_each
-
-        gross_area_all_faces = base_area_one_face * face_count
-        deduction_all_faces = large_opening_area_total * face_count
-
-        net_area = gross_area_all_faces - deduction_all_faces
-        if net_area < 0:
-            net_area = 0.0
-
-        face_text = "one face" if face_count == 1 else f"{face_count} faces"
-        coat_text = f"{coats} coats" if coats > 1 else "one coat"
-
-        desc_parts = [
-            f"{coat_text} of {paint_type} paint over primer on {face_text}",
-        ]
-        if n_large_openings > 0:
-            desc_parts.append(
-                f"with deduction for {n_large_openings} opening(s) > 0.5 m² as per IS 1200 Part 13"
-            )
-        else:
-            desc_parts.append(
-                "no deduction for openings ≤ 0.5 m² as per IS 1200 Part 13"
-            )
-
-        desc = ", ".join(desc_parts)
-
-        return MeasurementItem(
-            description=desc,
-            quantity=net_area,
-            unit="Sqm",
-            is_code_ref="IS 1200 Part 13",
-        )
-
-    # -----------------------------
-    # 9. Flooring (with openings)
-    # -----------------------------
+    # ============================================================
+    # 8. FLOORING (With Openings)
+    # ============================================================
     def measure_flooring(
         self,
         length: float,
@@ -380,10 +317,10 @@ class IS1200Engine:
         """
         Flooring measurement as per IS 1200 Part 11.
 
-        - Base area = L x B (finished floor)
-        - No deduction for openings ≤ 0.1 m²
-        - Deduct openings > 0.1 m²
-        - Quantity in Sqm; thickness for description only.
+        Base area = L x B (finished floor surface, Sqm)
+        No deduction for openings ≤ 0.1 m²
+        Deduct openings > 0.1 m²
+        Thickness for description only; quantity in Sqm
         """
         gross_area = length * width
 
@@ -418,9 +355,9 @@ class IS1200Engine:
             is_code_ref="IS 1200 Part 11",
         )
 
-    # -----------------------------
-    # 10. Formwork (contact area)
-    # -----------------------------
+    # ============================================================
+    # 9. FORMWORK (Concrete Contact Area)
+    # ============================================================
     def measure_formwork(
         self,
         member_type: str,
@@ -431,16 +368,16 @@ class IS1200Engine:
         """
         Formwork measurement as per IS 1200 Part 5.
 
-        Quantity is concrete contact area (Sqm):
-
-        - Slab:  soffit area (L x B)
+        Quantity = concrete contact area (Sqm):
+        - Slab:  soffit area = plan (L x B)
         - Beam:  2 sides (D x L) + soffit (B x L)
-        - Column: perimeter x height
+        - Column: 4 sides = perimeter x height
         - Footing: 2(L x D) + 2(B x D)
 
         No deduction for small openings ≤ 0.4 m², fillets, chamfers.
         """
-        mt = member_type.lower()
+        mt = member_type.lower().strip()
+
         if mt == "slab":
             area = length * width
             desc = f"Formwork to soffit of RCC slab {length:.2f} m x {width:.2f} m"
@@ -480,4 +417,65 @@ class IS1200Engine:
             quantity=area,
             unit="Sqm",
             is_code_ref="IS 1200 Part 5",
+        )
+
+    # ============================================================
+    # 10. PAINTING / FINISHING (With Openings)
+    # ============================================================
+    def measure_painting(
+        self,
+        length: float,
+        height: float,
+        face_count: int = 1,
+        n_small_openings: int = 0,
+        area_small_each: float = 0.0,
+        n_large_openings: int = 0,
+        area_large_each: float = 0.0,
+        coats: int = 2,
+        paint_type: str = "acrylic",
+    ) -> MeasurementItem:
+        """
+        Painting measurement as per IS 1200 Part 13.
+
+        Uses same area rules as plaster (deduct only openings > 0.5 m²)
+        Quantity = net surface area (Sqm)
+        Coats and type in description only; they affect rate, not quantity
+        """
+        base_area_one_face = length * height
+
+        # Small openings (≤ 0.5 m²) – no deduction
+        small_opening_area_total = n_small_openings * area_small_each
+
+        # Large openings (> 0.5 m²) – deduct
+        large_opening_area_total = n_large_openings * area_large_each
+
+        gross_area_all_faces = base_area_one_face * face_count
+        deduction_all_faces = large_opening_area_total * face_count
+
+        net_area = gross_area_all_faces - deduction_all_faces
+        if net_area < 0:
+            net_area = 0.0
+
+        face_text = "one face" if face_count == 1 else f"{face_count} faces"
+        coat_text = f"{coats} coats" if coats > 1 else "one coat"
+
+        desc_parts = [
+            f"{coat_text} of {paint_type} paint over primer on {face_text}",
+        ]
+        if n_large_openings > 0:
+            desc_parts.append(
+                f"with deduction for {n_large_openings} opening(s) > 0.5 m² as per IS 1200 Part 13"
+            )
+        else:
+            desc_parts.append(
+                "no deduction for openings ≤ 0.5 m² as per IS 1200 Part 13"
+            )
+
+        desc = ", ".join(desc_parts)
+
+        return MeasurementItem(
+            description=desc,
+            quantity=net_area,
+            unit="Sqm",
+            is_code_ref="IS 1200 Part 13",
         )
