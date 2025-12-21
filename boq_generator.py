@@ -6,9 +6,6 @@ from io import BytesIO
 
 @dataclass
 class BOQItem:
-    """
-    Single BOQ line item.
-    """
     item_no: str
     description: str
     unit: str
@@ -21,16 +18,10 @@ class BOQItem:
 
 
 class BOQGenerator:
-    """
-    Helper to collect BOQ items and output them as
-    a pandas DataFrame and Excel bytes (BOQ + Abstract).
-    """
-
     def __init__(self):
         self.items: List[BOQItem] = []
 
     def clear_items(self) -> None:
-        """Remove all stored BOQ items."""
         self.items = []
 
     def add_boq_item(
@@ -45,7 +36,6 @@ class BOQGenerator:
         wbs_level2: str,
         is_reference: str,
     ) -> None:
-        """Append one BOQ line item."""
         self.items.append(
             BOQItem(
                 item_no=item_no,
@@ -61,20 +51,6 @@ class BOQGenerator:
         )
 
     def generate_dataframe(self, project_name: str, project_location: str) -> pd.DataFrame:
-        """
-        Build a DataFrame in standard BOQ format.
-
-        Columns:
-        - Item No
-        - Description of Item
-        - Unit
-        - Quantity
-        - Rate (₹)
-        - Amount (₹)
-        - WBS Level 1
-        - WBS Level 2
-        - IS Reference
-        """
         data = [
             {
                 "Item No": it.item_no,
@@ -104,22 +80,20 @@ class BOQGenerator:
         overhead_pct: float | None = None,
         profit_pct: float | None = None,
         gst_pct: float | None = None,
+        cost_index: float | None = None,
+        dsr_year: str | None = None,
     ) -> bytes:
         """
-        Convert the BOQ DataFrame to an in-memory Excel file (bytes),
-        with two sheets:
-        - 'BOQ'      : Detailed item-wise BOQ
-        - 'Abstract' : Section-wise totals + percentage provisions
+        Create Excel with:
+        - BOQ sheet
+        - Abstract sheet (section totals + percentage provisions + cost index note)
         """
         output = BytesIO()
         with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            # Sheet 1: Detailed BOQ
             df_boq.to_excel(writer, index=False, sheet_name="BOQ")
 
-            # Sheet 2: Abstract of cost
             abstract_rows = []
 
-            # Section-wise totals
             if section_totals is not None and not section_totals.empty:
                 abstract_rows.append({"Head": "Section-wise totals", "Amount (₹)": ""})
                 for _, row in section_totals.iterrows():
@@ -130,7 +104,6 @@ class BOQGenerator:
                         }
                     )
 
-            # Base total and percentage provisions
             cont_amt = 0.0
             oh_amt = 0.0
             profit_amt = 0.0
@@ -145,7 +118,6 @@ class BOQGenerator:
                     }
                 )
 
-                # Contingency
                 if contingency_pct is not None:
                     cont_amt = base_total * contingency_pct / 100.0
                     abstract_rows.append(
@@ -155,7 +127,6 @@ class BOQGenerator:
                         }
                     )
 
-                # Overheads
                 if overhead_pct is not None:
                     oh_amt = base_total * overhead_pct / 100.0
                     abstract_rows.append(
@@ -165,7 +136,6 @@ class BOQGenerator:
                         }
                     )
 
-                # Contractor's profit
                 if profit_pct is not None:
                     profit_base = base_total + cont_amt + oh_amt
                     profit_amt = profit_base * profit_pct / 100.0
@@ -176,7 +146,6 @@ class BOQGenerator:
                         }
                     )
 
-                # GST
                 if gst_pct is not None:
                     tax_base = base_total + cont_amt + oh_amt + profit_amt
                     gst_amt = tax_base * gst_pct / 100.0
@@ -187,7 +156,6 @@ class BOQGenerator:
                         }
                     )
 
-                # Grand total
                 final_total = base_total + cont_amt + oh_amt + profit_amt + gst_amt
                 abstract_rows.append({"Head": "", "Amount (₹)": ""})
                 abstract_rows.append(
@@ -197,9 +165,17 @@ class BOQGenerator:
                     }
                 )
 
+            if cost_index is not None or dsr_year:
+                abstract_rows.append({"Head": "", "Amount (₹)": ""})
+                note = "Rates based on "
+                if dsr_year:
+                    note += dsr_year
+                if cost_index is not None:
+                    note += f", Cost Index = {cost_index:.2f}%"
+                abstract_rows.append({"Head": note, "Amount (₹)": ""})
+
             if abstract_rows:
                 df_abs = pd.DataFrame(abstract_rows)
                 df_abs.to_excel(writer, index=False, sheet_name="Abstract")
 
         return output.getvalue()
-        
