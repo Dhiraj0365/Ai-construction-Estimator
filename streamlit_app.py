@@ -84,17 +84,40 @@ with tab_qto:
         index=0,
     )
 
+    # ========== SET REALISTIC DEFAULTS PER WORK TYPE ==========
+    base_length = 4.0
+    base_width = 3.0
+    base_thk = 0.15
+
+    if "RCC Slab" in qto_type:
+        base_length, base_width, base_thk = 4.0, 3.0, 0.15
+    elif "RCC Beam" in qto_type:
+        base_length, base_width, base_thk = 4.0, 0.23, 0.45
+    elif "RCC Column" in qto_type:
+        base_length, base_width, base_thk = 0.23, 0.45, 3.0
+    elif "RCC Footing" in qto_type:
+        base_length, base_width, base_thk = 1.5, 1.5, 0.45
+    elif "Brick Masonry" in qto_type:
+        base_length, base_width, base_thk = 4.0, 0.23, 3.0  # height
+    elif "Plastering" in qto_type or "Painting" in qto_type:
+        base_length, base_width, base_thk = 4.0, 0.23, 3.0
+    elif "Flooring" in qto_type or "Formwork" in qto_type:
+        base_length, base_width, base_thk = 4.0, 3.0, 0.15
+    elif "PCC" in qto_type:
+        base_length, base_width, base_thk = 4.0, 3.0, 0.10
+    # Earthwork, reinforcement keep generic defaults
+
     # Common geometry inputs
     col1, col2, col3 = st.columns(3)
     with col1:
-        length = st.number_input("Length (m)", min_value=0.1, value=10.0)
+        length = st.number_input("Length (m)", min_value=0.1, value=base_length)
     with col2:
-        width = st.number_input("Width (m)", min_value=0.1, value=5.0)
+        width = st.number_input("Width (m)", min_value=0.1, value=base_width)
     with col3:
         depth_or_thk = st.number_input(
             "Depth / Height / Thickness (m or kg*)",
             min_value=0.05,
-            value=1.2,
+            value=base_thk,
             help="For reinforcement (direct kg), treat this as total weight in kg.",
         )
 
@@ -133,13 +156,25 @@ with tab_qto:
                 index=0,
             )
 
-    # ============== MASONRY EXTRAS ==============
+    # ============== MASONRY EXTRAS (with separate wall thickness) ==============
     n_small_openings = 0
     area_small_each = 0.0
     n_large_openings = 0
     area_large_each = 0.0
+    wall_thickness = 0.23
 
     if "Brick Masonry" in qto_type:
+        st.markdown("#### Masonry configuration (IS 1200 Part 3)")
+        col_mw1, col_mw2 = st.columns(2)
+        with col_mw1:
+            wall_thickness = st.number_input(
+                "Wall thickness (m)",
+                min_value=0.075,
+                value=0.23,
+                step=0.01,
+                help="Use 0.23 for 230 mm wall, 0.115 for half-brick, 0.34 for brick-and-half, etc.",
+            )
+
         st.markdown("#### Masonry openings (IS 1200 Part 3)")
         col_m1, col_m2, col_m3, col_m4 = st.columns(4)
         with col_m1:
@@ -407,7 +442,7 @@ with tab_qto:
                 item = engine.measure_masonry(
                     length=length,
                     height=depth_or_thk,
-                    thickness=width,
+                    thickness=wall_thickness,
                     material="brick",
                     n_small_openings=n_small_openings,
                     area_small_each=area_small_each,
@@ -531,24 +566,26 @@ with tab_rate:
                 expanded=True,
             ):
                 desc_lower = item.description.lower()
+
+                # ========== IMPROVED TUNED BASE RATES (DSR 2023 approx) ==========
                 if "earthwork" in desc_lower or "excavation" in desc_lower:
-                    base_rate = 260.0
+                    base_rate = 250.0  # ₹/Cum
                 elif "pcc" in desc_lower or ("plain" in desc_lower and "concrete" in desc_lower):
-                    base_rate = 4500.0
+                    base_rate = 4800.0  # ₹/Cum
                 elif "rcc" in desc_lower:
-                    base_rate = 7500.0
+                    base_rate = 8500.0  # ₹/Cum for M25 structural RCC
                 elif "masonry" in desc_lower:
-                    base_rate = 5500.0
+                    base_rate = 5800.0  # ₹/Cum for brick masonry CM 1:6
                 elif "plaster" in desc_lower:
-                    base_rate = 250.0
+                    base_rate = 280.0  # ₹/Sqm for 12mm plaster
                 elif "floor" in desc_lower or "tile" in desc_lower:
-                    base_rate = 800.0
+                    base_rate = 950.0  # ₹/Sqm for vitrified tiles
                 elif "formwork" in desc_lower:
-                    base_rate = 900.0
+                    base_rate = 650.0  # ₹/Sqm for slab/beam formwork
                 elif "reinforcement" in desc_lower:
-                    base_rate = 80.0
+                    base_rate = 75.0  # ₹/Kg for TMT
                 elif "paint" in desc_lower or "finishing" in desc_lower:
-                    base_rate = 120.0
+                    base_rate = 150.0  # ₹/Sqm for 2 coats acrylic
                 else:
                     base_rate = 1000.0
 
@@ -739,7 +776,7 @@ with tab_boq:
                         "Note / Justification (optional)",
                         value="",
                         key=f"note_{idx}",
-                        help="Example: 'Rate as per vendor quote dated 20-12-2025'.",
+                        help="Example: 'Rate as per vendor quote dated 22-12-2025'.",
                     )
 
                 # Keyword-based DSR suggestion
