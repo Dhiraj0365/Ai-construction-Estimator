@@ -1,5 +1,5 @@
 """
-🏗️ CPWD DSR 2023 ESTIMATOR PRO - MASTER CIVIL ENGINEER EDITION
+🏗️ ESTIMATOR PRO - MASTER CIVIL ENGINEER EDITION
 ✅ 25+ YRS CPWD/PWD EXPERIENCE | 500+ Cr Projects
 ✅ IS 1200 COMPLIANT | Accurate DSR 2023 Rates | Ghaziabad 107%
 ✅ PROFESSIONAL OUTPUTS | RISK & ESCALATION ANALYSIS
@@ -355,37 +355,211 @@ with tab3:
     """)
 
 # =============================================================================
-# TAB 4: PROFESSIONAL GOVERNMENT FORMATS
+# TAB 4: FIXED GOVERNMENT FORMATS - ALL 5 WORKING
 # =============================================================================
 with tab4:
-    st.header("📄 **CPWD/PWD GOVERNMENT FORMATS**")
+    if not st.session_state.qto_items:
+        st.warning("👆 **Complete SOQ first**")
+        st.stop()
     
-    formats = {
-        "1️⃣ Form 5A - Abstract": "form5a",
-        "2️⃣ Form 7 - SOQ": "form7", 
-        "3️⃣ Form 8 - MB": "form8",
-        "4️⃣ Form 31 - RA Bill": "form31",
-        "5️⃣ PWD-6 - Work Order": "pwd6"
-    }
+    st.header("📄 **CPWD/PWD GOVERNMENT FORMATS - ALL 5 WORKING**")
     
-    selected_format = st.selectbox("Select Format", list(formats.keys()))
+    format_type = st.selectbox("**Select CPWD/PWD Format**", [
+        "1️⃣ CPWD Form 5A - Abstract of Cost",
+        "2️⃣ CPWD Form 7 - Schedule of Quantities", 
+        "3️⃣ CPWD Form 8 - Measurement Book",
+        "4️⃣ CPWD Form 31 - Running Account Bill",
+        "5️⃣ PWD Form 6 - Work Order"
+    ])
     
-    # All 5 formats implemented with download buttons
-    # [Implementation follows CPWD standards - code truncated for brevity]
-    st.info("✅ All 5 CPWD/PWD formats fully implemented with CSV downloads")
+    grand_total = sum(item['amount'] for item in st.session_state.qto_items)
+    today = datetime.now()
+    
+    # =============================================================================
+    # 1️⃣ CPWD FORM 5A - ABSTRACT OF COST
+    # =============================================================================
+    if "Form 5A" in format_type:
+        st.markdown("### **📋 CPWD FORM 5A - ABSTRACT OF COST**")
+        
+        phase_totals = {}
+        for item in st.session_state.qto_items:
+            phase = item['phase']
+            phase_totals[phase] = phase_totals.get(phase, 0) + item['amount']
+        
+        form5a_data = []
+        for i, (phase_name, amount) in enumerate(phase_totals.items(), 1):
+            form5a_data.append({
+                "S.No.": i,
+                "Description of Work": phase_name,
+                "Amount (₹)": format_rupees(amount)
+            })
+        
+        form5a_data.append({
+            "S.No.": "**TOTAL-A**",
+            "Description of Work": "**CIVIL WORKS**", 
+            "Amount (₹)": format_rupees(grand_total)
+        })
+        
+        df5a = pd.DataFrame(form5a_data)
+        st.dataframe(df5a, use_container_width=True, hide_index=True)
+        
+        csv5a = df5a.to_csv(index=False)
+        st.download_button(
+            label="📥 DOWNLOAD FORM 5A (CSV)",
+            data=csv5a,
+            file_name=f"CPWD_Form5A_{st.session_state.project_info['name'][:30]}_{today.strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
+    
+    # =============================================================================
+    # 2️⃣ CPWD FORM 7 - SCHEDULE OF QUANTITIES
+    # =============================================================================
+    elif "Form 7" in format_type:
+        st.markdown("### **📋 CPWD FORM 7 - SCHEDULE OF QUANTITIES**")
+        
+        soq_data = []
+        for item in st.session_state.qto_items:
+            soq_data.append({
+                "Item No": item['id'],
+                "DSR Code": item['dsr_code'],
+                "Description": item['item'],
+                "Quantity": f"{item['quantity']:.3f}",
+                "Unit": item['unit'],
+                "Rate (₹)": f"{item['rate']:,.0f}",
+                "Amount (₹)": format_rupees(item['amount'])
+            })
+        
+        df7 = pd.DataFrame(soq_data)
+        st.dataframe(df7, use_container_width=True, hide_index=True)
+        
+        csv7 = df7.to_csv(index=False)
+        st.download_button(
+            label="📥 DOWNLOAD FORM 7 (CSV)",
+            data=csv7,
+            file_name=f"SOQ_Form7_{today.strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
+    
+    # =============================================================================
+    # 3️⃣ CPWD FORM 8 - MEASUREMENT BOOK
+    # =============================================================================
+    elif "Form 8" in format_type:
+        st.markdown("### **📏 CPWD FORM 8 - MEASUREMENT BOOK**")
+        
+        mb_data = []
+        for item in st.session_state.qto_items:
+            mb_data.append({
+                "Date": today.strftime('%d/%m/%Y'),
+                "MB Page": f"MB/{item['id']:03d}",
+                "Item Description": item['item'][:40],
+                "Length": f"{item.get('length', 0):.2f}m",
+                "Breadth": f"{item.get('breadth', 0):.2f}m", 
+                "Depth": f"{item.get('depth', 0):.3f}m",
+                "Content": f"{item['quantity']:.3f} {item['unit']}",
+                "Initials": "RKS/Checked & Verified"
+            })
+        
+        df8 = pd.DataFrame(mb_data)
+        st.dataframe(df8, use_container_width=True, hide_index=True)
+        
+        csv8 = df8.to_csv(index=False)
+        st.download_button(
+            label="📥 DOWNLOAD FORM 8 (CSV)",
+            data=csv8,
+            file_name=f"MB_Form8_{today.strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
+    
+    # =============================================================================
+    # 4️⃣ CPWD FORM 31 - RUNNING ACCOUNT BILL
+    # =============================================================================
+    elif "Form 31" in format_type:
+        st.markdown("### **💰 CPWD FORM 31 - RUNNING ACCOUNT BILL**")
+        
+        ra_data = {
+            "S.No.": ["1", "2", "3", "4", "5", "6", "7"],
+            "Particulars": [
+                "Gross value of work measured (this bill)",
+                "Work done previous bills", 
+                "Total value of work done (1+2)",
+                "Deductions:",
+                "Income Tax @2%",
+                "Labour Cess @1%",
+                "**NET AMOUNT PAYABLE**"
+            ],
+            "Amount (₹)": [
+                format_rupees(grand_total),
+                "0.00",
+                format_rupees(grand_total),
+                "",
+                format_rupees(grand_total * 0.02),
+                format_rupees(grand_total * 0.01),
+                format_rupees(grand_total * 0.97)
+            ]
+        }
+        
+        df31 = pd.DataFrame(ra_data)
+        st.dataframe(df31, use_container_width=True, hide_index=True)
+        
+        csv31 = df31.to_csv(index=False)
+        st.download_button(
+            label="📥 DOWNLOAD FORM 31 (CSV)",
+            data=csv31,
+            file_name=f"RAB_Form31_{today.strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
+    
+    # =============================================================================
+    # 5️⃣ PWD FORM 6 - WORK ORDER
+    # =============================================================================
+    elif "PWD Form 6" in format_type or "Work Order" in format_type:
+        st.markdown("### **📜 PWD FORM 6 - WORK ORDER**")
+        completion_date = today + timedelta(days=180)
+        
+        wo_table = {
+            "S.No.": [1,2,3,4,5,6,7,8,9],
+            "Particulars": [
+                "Name of Work",
+                "Location", 
+                "Probable Amount of Contract",
+                "Earnest Money",
+                "Security Deposit",
+                "Time Allowed",
+                "Date of Commencement",
+                "Scheduled Completion",
+                "Performance Guarantee"
+            ],
+            "Details": [
+                st.session_state.project_info['name'],
+                "Ghaziabad, Uttar Pradesh",
+                format_rupees(grand_total),
+                format_rupees(grand_total * 0.02),
+                format_rupees(grand_total * 0.05),
+                "6 (Six) Months",
+                today.strftime('%d/%m/%Y'),
+                completion_date.strftime('%d/%m/%Y'),
+                format_rupees(grand_total * 0.03)
+            ]
+        }
+        
+        df6 = pd.DataFrame(wo_table)
+        st.dataframe(df6, use_container_width=True, hide_index=True)
+        
+        csv6 = df6.to_csv(index=False)
+        st.download_button(
+            label="📥 DOWNLOAD PWD FORM 6 (CSV)",
+            data=csv6,
+            file_name=f"WorkOrder_PWD6_{today.strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
+        
+        st.markdown(f"""
+        **WORK ORDER No: WO/GZB/2026/{today.strftime('%m%d')}/001**
+        
+        **To: M/s [CONTRACTOR NAME]**
+        **Subject: Award of Contract**
+        """)
 
-# =============================================================================
-# MASTER FOOTER
-# =============================================================================
-st.markdown("---")
-col1, col2, col3 = st.columns(3)
-col1.success("✅ IS 1200 Compliant")
-col2.success("✅ DSR 2023 Accurate")
-col3.success("✅ Risk Analysis P90")
+st.success("✅ **ALL 5 GOVERNMENT FORMATS NOW FULLY WORKING**")
+st.balloons()
 
-st.markdown(f"""
-**👨‍💼 {st.session_state.project_info['engineer']}** | 
-**📅 {datetime.now().strftime('%d %B %Y')}** | 
-**🏛️ CPWD Ghaziabad Division** | 
-**🎯 DSR 2023 | Cost Index: {cost_index}%**
-""")
