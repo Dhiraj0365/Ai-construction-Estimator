@@ -143,7 +143,7 @@ if "project_info" not in st.session_state:
 st.markdown("""
 <div style='background: linear-gradient(90deg, #1e3c72 0%, #2a5298 100%); padding:2rem; border-radius:1rem; color:white; text-align:center'>
     <h1 style='margin:0; font-size:3rem;'>🏗️ CONSTRUCTION ESTIMATOR</h1>
-    <p style='margin:0; font-size:1.3rem;'>IS 1200 Compliant | Ghaziabad 107% | 25+ Yrs CPWD Experience</p>
+    <p style='margin:0; font-size:1.3rem;'>IS 1200 Compliant | CPWD Experience</p>
 </div>
 """, unsafe_allow_html=True)
 
