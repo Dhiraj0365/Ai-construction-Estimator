@@ -121,7 +121,7 @@ def monte_carlo_simulation(base_cost, n_simulations=1000):
 # STREAMLIT PROFESSIONAL UI
 # =============================================================================
 st.set_page_config(
-    page_title="CPWD DSR 2023 - Master Edition",
+    page_title="CONSTRUCTION ESTIMATOR",
     page_icon="🏗️", 
     layout="wide",
     initial_sidebar_state="expanded"
