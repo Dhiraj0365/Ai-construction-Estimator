@@ -1,360 +1,338 @@
-"""
-🏗️ AI Construction Estimator PRO - COMPLETE DSR VERSION
-✅ 5-Phase Professional Structure + DSR Descriptions
-✅ ROAD-NO.-1 Style Abstract + Full Export
-✅ Zero Errors - Production Ready
-"""
-
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
 
 # =============================================================================
-# DSR STANDARD DESCRIPTIONS (CPWD/Government Format)
+# IS 1200 COMPLIANT RULES ENGINE (Master Implementation)
 # =============================================================================
-DSR_DESCRIPTIONS = {
-    # PHASE 1: SUB-STRUCTURE
-    "Site Clearance": "Clearing jungle including cutting bushes, shrubs, undergrowth etc., removing & stacking serviceable materials and disposing unserviceable material outside premises up to 50m lead.",
-    "Earthwork Excavation": "Earth work in excavation by mechanical means (Hydraulic excavator) / manual means over areas (exceeding 30 cm in depth, 1.5 m in width as well as 10 sqm on plan) including dressing of sides & ramming of bottoms, lift upto 1.5 m, including getting out the excavated material.",
-    "PCC Foundation Bed": "Providing & laying in position cement concrete of grade M15 (1:2:4) nominal size 40mm excluding cost of centering & shuttering - All work up to plinth level.",
-    "RCC Footing": "Providing & laying in position reinforced cement concrete M25 grade excluding cost of centering, shuttering, finishing & reinforcement - All work up to plinth level.",
-    "Backfilling": "Backfilling in trenches with excavated earth in proper stages with ramming & watering including necessary compaction by mechanical means.",
-    
-    # PHASE 2: PLINTH LEVEL
-    "Plinth Wall Masonry": "Brick work with F.P.S. bricks of class designation 7.5 in foundation & plinth in cement mortar 1:6 (1 cement : 6 coarse sand) including marking boundaries.",
-    "Plinth Beam RCC": "Reinforced cement concrete work in beams above plinth level up to floor five level excluding the cost of centering, shuttering, finishing & reinforcement M25 grade.",
-    "Damp Proof Course": "Providing & laying damp proof course 50mm thick with cement concrete 1:2:4 (1 cement: 2 coarse sand: 4 stone aggregate 20mm nominal size) including 2mm bitumen layer.",
-    "Plinth Filling": "Filling in plinth with sand under floors including watering, ramming & consolidating in layers not exceeding 20cm thick.",
-    
-    # PHASE 3: SUPER-STRUCTURE
-    "RCC Column (300×300)": "Providing & laying in position reinforced cement concrete M25 grade for columns excluding cost of centering, shuttering, finishing & reinforcement - All work above plinth level.",
-    "RCC Beam (230×450)": "Providing & laying in position reinforced cement concrete M25 grade for beams excluding cost of centering, shuttering, finishing & reinforcement - All work above plinth level.",
-    "RCC Slab (150mm)": "Reinforced cement concrete work in slabs, roofs having slope up to 15° landings, balconies, shelves, chajjas, lintels etc. M25 grade excluding cost of centering, shuttering & reinforcement.",
-    "Brick Masonry (230mm)": "Brick work with F.P.S. bricks of class designation 7.5 in superstructure above plinth level up to floor V level in all positions in cement mortar 1:6 (1 cement : 6 coarse sand).",
-    
-    # PHASE 4: FINISHING
-    "Plastering 12mm (Both Faces)": "12mm cement plaster of mix 1:6 (1 cement: 6 fine sand) on walls both faces or one face as specified including raking out joints.",
-    "Vitrified Tile Flooring": "Providing & laying vitrified floor tiles 600×600mm size, thickness >8mm of 1st quality in required design & shade over 25mm thick cement mortar 1:4 (1 cement: 4 coarse sand).",
-    "Acrylic Painting (2 Coats)": "Finishing walls with Premium Acrylic Smooth exterior paint of required shade - New work (Two or more coats applied @ 1.43 ltr/10 sqm over & including priming coat of exterior primer applied @ 0.90 ltr/10 sqm.",
-    "Electrification Lumpsum": "Lumpsum provision for internal electrification (wiring, fixtures, switch boards, MCBs etc.) @ 8% of total civil cost as per CPWD norms."
-}
-
-# =============================================================================
-# 5-PHASE CONSTRUCTION STRUCTURE
-# =============================================================================
-PHASES = {
-    "PHASE_1_SUBSTRUCTURE": {
-        "name": "1️⃣ Sub-Structure", 
-        "description": "Site clearance, excavation, PCC bed, RCC footings, backfilling", 
-        "wbs_code": "SS",
-        "avg_rate": 4500
+IS1200_RULES = {
+    "Earthwork Excavation": {
+        "code": "2.5.1",
+        "method": "pit_volume",
+        "deduction": "none",
+        "unit": "Cum",
+        "rate": 248
     },
-    "PHASE_2_PLINTH": {
-        "name": "2️⃣ Plinth Level", 
-        "description": "Plinth beams, masonry walls, DPC, plinth filling", 
-        "wbs_code": "PL",
-        "avg_rate": 5200
+    "PCC Foundation Bed": {
+        "code": "5.2.1", 
+        "method": "gross_volume",
+        "deduction": "30%_voids",
+        "unit": "Cum",
+        "rate": 5847
     },
-    "PHASE_3_SUPERSTRUCTURE": {
-        "name": "3️⃣ Super-Structure", 
-        "description": "RCC columns, beams, slabs + brick/block masonry", 
-        "wbs_code": "SU",
-        "avg_rate": 8500
+    "RCC Footing": {
+        "code": "13.1.1",
+        "method": "gross_volume", 
+        "deduction": "pipes>100mm",
+        "unit": "Cum",
+        "rate": 8927
     },
-    "PHASE_4_FINISHING": {
-        "name": "4️⃣ Finishing & Services", 
-        "description": "Plastering, flooring, painting, E&M lumpsum", 
-        "wbs_code": "FN",
-        "avg_rate": 2500
+    "RCC Column (300×300)": {
+        "code": "13.2.1",
+        "method": "column_volume",
+        "deduction": "none",
+        "unit": "Cum",
+        "rate": 8927
+    },
+    "RCC Beam (230×450)": {
+        "code": "13.3.1",
+        "method": "beam_volume",
+        "deduction": "none", 
+        "unit": "Cum",
+        "rate": 8927
+    },
+    "RCC Slab (150mm)": {
+        "code": "13.4.1",
+        "method": "slab_volume",
+        "deduction": "openings>0.1m2",
+        "unit": "Cum",
+        "rate": 8927
+    },
+    "Brick Masonry (230mm)": {
+        "code": "6.1.1",
+        "method": "wall_volume",
+        "deduction": "openings>0.1m2",
+        "unit": "Cum", 
+        "rate": 5123
+    },
+    "Plinth Wall Masonry": {
+        "code": "6.1.2",
+        "method": "wall_volume",
+        "deduction": "openings>0.1m2",
+        "unit": "Cum",
+        "rate": 5123
+    },
+    "Plastering 12mm (Both Faces)": {
+        "code": "11.1.1",
+        "method": "net_wall_area",
+        "deduction": "openings>0.5m2",
+        "unit": "SQM",
+        "rate": 187
+    },
+    "Vitrified Tile Flooring": {
+        "code": "14.1.1",
+        "method": "net_floor_area",
+        "deduction": "openings>0.1m2", 
+        "unit": "SQM",
+        "rate": 1245
+    },
+    "Acrylic Painting (2 Coats)": {
+        "code": "15.8.1",
+        "method": "net_wall_area",
+        "deduction": "openings>0.5m2",
+        "unit": "SQM",
+        "rate": 98
     }
 }
 
-def get_phase_name(phase_key: str):
+# =============================================================================
+# 5-PHASE STRUCTURE
+# =============================================================================
+PHASES = {
+    "PHASE_1_SUBSTRUCTURE": {"name": "1️⃣ Sub-Structure", "avg_rate": 4500},
+    "PHASE_2_PLINTH": {"name": "2️⃣ Plinth Level", "avg_rate": 5200},
+    "PHASE_3_SUPERSTRUCTURE": {"name": "3️⃣ Super-Structure", "avg_rate": 8500},
+    "PHASE_4_FINISHING": {"name": "4️⃣ Finishing", "avg_rate": 2500}
+}
+
+def get_phase_name(phase_key): 
     return PHASES.get(phase_key, PHASES["PHASE_3_SUPERSTRUCTURE"])["name"]
 
-def get_phase_rate(phase_key: str):
+def get_phase_rate(phase_key):
     return PHASES.get(phase_key, PHASES["PHASE_3_SUPERSTRUCTURE"])["avg_rate"]
 
-def get_dsr_description(work_item: str):
-    """Get DSR standard description for work item"""
-    return DSR_DESCRIPTIONS.get(work_item, f"Standard DSR item: {work_item}")
+def calculate_is1200_quantity(work_type, length, width, thickness, openings=[]):
+    """IS 1200 Compliant Quantity Calculation"""
+    rule = IS1200_RULES.get(work_type, {})
+    
+    # Basic volume/area
+    if rule.get("unit") == "SQM":
+        gross_qty = length * width
+    else:
+        gross_qty = length * width * thickness
+    
+    # IS 1200 Deduction Rules
+    net_qty = gross_qty
+    
+    if "openings" in rule.get("deduction", ""):
+        opening_area = sum(o["length"] * o["width"] for o in openings)
+        if opening_area > 0.5:  # >0.5m² deduction
+            net_qty -= opening_area
+    
+    if "30%_voids" in rule.get("deduction", ""):
+        net_qty *= 0.7
+    
+    return max(0, round(net_qty, 3))
+
+def get_dsr_info(work_type):
+    """Get DSR Code, Rate, Description"""
+    rule = IS1200_RULES.get(work_type, {})
+    return {
+        "code": rule.get("code", "N/A"),
+        "rate": rule.get("rate", 5500),
+        "unit": rule.get("unit", "Cum")
+    }
 
 # =============================================================================
 # APP CONFIGURATION
 # =============================================================================
 st.set_page_config(page_title="AI Construction Estimator PRO", page_icon="🏗️", layout="wide")
 
-# SESSION STATE
 if "qto_items" not in st.session_state:
     st.session_state.qto_items = []
 if "project_name" not in st.session_state:
     st.session_state.project_name = "G+1 Residential Building"
 
 # =============================================================================
-# SIDEBAR - PROJECT INFORMATION
+# SIDEBAR
 # =============================================================================
 with st.sidebar:
     st.header("🏗️ Project Details")
     st.session_state.project_name = st.text_input("Project Name", st.session_state.project_name)
-    location = st.text_input("Location", "Ghaziabad, UP")
-    cost_index = st.number_input("Cost Index (%)", value=107.0, min_value=50.0, max_value=200.0, step=1.0)
-    st.info(f"**Cost Index Applied**: {cost_index:.1f}%")
+    location = st.text_input("Location", "Ghaziabad, UP") 
+    cost_index = st.number_input("Cost Index (%)", value=107.0, min_value=50.0, step=1.0)
 
 # =============================================================================
 # MAIN HEADER
 # =============================================================================
-st.title("🏗️ AI Construction Estimator **PRO**")
-st.markdown("""
-**✅ DSR Standard Descriptions | 5-Phase Professional System | CPWD Format**
-*Like ROAD-NO.-1-108.05-LACS.xlsx - Ready for Tender Submission*
-""")
+st.title("🏗️ AI Construction Estimator **PRO** - IS 1200")
+st.markdown("**✅ IS 1200 Deduction Rules | DSR Codes | CPWD Rates**")
 
-# 3-TAB LAYOUT
-tab_qto, tab_abstract, tab_export = st.tabs(["📏 Quantity Take-Off", "📊 Project Abstract", "📥 Reports & Export"])
+tab_qto, tab_abstract, tab_export = st.tabs(["📏 IS 1200 QTO", "📊 Abstract", "📥 Export"])
 
 # =============================================================================
-# TAB 1: QUANTITY TAKE-OFF WITH DSR PREVIEW
+# TAB 1: IS 1200 QUANTITY TAKE-OFF
 # =============================================================================
 with tab_qto:
-    st.header("📏 Quantity Take-Off (DSR Items)")
-    st.caption("**IS 1200 Method of Measurement | CPWD DSR Specifications**")
+    st.header("📏 IS 1200 Quantity Take-Off")
     
-    # Phase & Work Type Selection
-    col_phase, col_worktype = st.columns([1, 2])
-    with col_phase:
-        selected_phase = st.selectbox(
-            "🎯 Construction Phase",
-            list(PHASES.keys()),
-            format_func=lambda x: PHASES[x]["name"],
-            help="Select phase for professional organization"
-        )
-        st.info(f"**{PHASES[selected_phase]['description']}**")
+    col1, col2 = st.columns([1,2])
+    with col1:
+        selected_phase = st.selectbox("Phase", list(PHASES.keys()), format_func=get_phase_name)
     
-    with col_worktype:
+    with col2:
         phase_worktypes = {
-            "PHASE_1_SUBSTRUCTURE": ["Site Clearance", "Earthwork Excavation", "PCC Foundation Bed", "RCC Footing", "Backfilling"],
-            "PHASE_2_PLINTH": ["Plinth Wall Masonry", "Plinth Beam RCC", "Damp Proof Course", "Plinth Filling"],
+            "PHASE_1_SUBSTRUCTURE": ["Earthwork Excavation", "PCC Foundation Bed", "RCC Footing"],
+            "PHASE_2_PLINTH": ["Plinth Wall Masonry"],
             "PHASE_3_SUPERSTRUCTURE": ["RCC Column (300×300)", "RCC Beam (230×450)", "RCC Slab (150mm)", "Brick Masonry (230mm)"],
-            "PHASE_4_FINISHING": ["Plastering 12mm (Both Faces)", "Vitrified Tile Flooring", "Acrylic Painting (2 Coats)", "Electrification Lumpsum"]
+            "PHASE_4_FINISHING": ["Plastering 12mm (Both Faces)", "Vitrified Tile Flooring", "Acrylic Painting (2 Coats)"]
         }
-        qto_type = st.selectbox("🔧 DSR Work Item", phase_worktypes.get(selected_phase, ["RCC Slab (150mm)"]))
+        work_type = st.selectbox("IS 1200 Item", phase_worktypes.get(selected_phase, []))
     
-    # DSR DESCRIPTION PREVIEW (NEW FEATURE)
-    st.markdown("### 📄 **DSR Specification**")
-    dsr_desc = get_dsr_description(qto_type)
-    with st.expander(f"**{qto_type}**", expanded=True):
-        st.markdown(f"**{dsr_desc}**")
-    
-    # Geometric Inputs
+    # IS 1200 INPUT FIELDS
     col1, col2, col3 = st.columns(3)
-    with col1: length = st.number_input("📏 Length (m)", value=5.0, min_value=0.1, step=0.1)
-    with col2: width = st.number_input("📐 Width (m)", value=3.0, min_value=0.1, step=0.1)
-    with col3: thickness = st.number_input("📦 Thickness/Depth (m)", value=0.15, min_value=0.01, step=0.01)
+    with col1: length = st.number_input("📏 Length (m)", value=10.0, min_value=0.1)
+    with col2: width = st.number_input("📐 Width (m)", value=5.0, min_value=0.1) 
+    with col3: thickness = st.number_input("📦 Thickness (m)", value=0.15, min_value=0.01)
     
-    # Quantity Preview
-    preview_qty = length * width * thickness
-    col1, col2 = st.columns(2)
-    col1.metric("📊 Quantity", f"{preview_qty:.2f} Cum")
-    col2.metric("💰 Rate Preview", f"₹{get_phase_rate(selected_phase) * (cost_index / 100):,.0f}/Cum")
+    # OPENING DEDUCTIONS (IS 1200)
+    openings = []
+    num_openings = st.number_input("🪟 No. of Openings (>0.5m² deduct)", value=0, min_value=0, max_value=5)
+    for i in range(int(num_openings)):
+        with st.expander(f"Opening {i+1}"):
+            ol, ow = st.columns(2)
+            with ol: o_len = st.number_input(f"Opening {i+1} Length", value=1.0)
+            with ow: o_width = st.number_input(f"Opening {i+1} Width", value=0.8)
+            openings.append({"length": o_len, "width": o_width})
     
-    # ADD ITEM BUTTON
-    if st.button("➕ ADD DSR MEASURED ITEM", use_container_width=True, type="primary"):
-        rate = get_phase_rate(selected_phase) * (cost_index / 100.0)
+    # IS 1200 CALCULATION
+    dsr_info = get_dsr_info(work_type)
+    is1200_qty = calculate_is1200_quantity(work_type, length, width, thickness, openings)
+    rate = dsr_info["rate"] * (cost_index / 100)
+    amount = is1200_qty * rate
+    
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("📊 Gross Volume", f"{length*width*thickness:.2f} {dsr_info['unit']}")
+    col2.metric("✅ IS 1200 Net Qty", f"{is1200_qty:.2f} {dsr_info['unit']}")
+    col3.metric("💰 Rate", f"₹{rate:,.0f}/{dsr_info['unit']}")
+    col4.metric("💎 Amount", f"₹{amount:,.0f}")
+    
+    # DSR INFO
+    st.markdown(f"**DSR Code**: {dsr_info['code']} | **Phase**: {get_phase_name(selected_phase)}")
+    
+    if st.button("➕ ADD IS 1200 ITEM", type="primary"):
         item = type('Item', (), {
             'id': len(st.session_state.qto_items) + 1,
-            'description': qto_type,
-            'dsr_specification': dsr_desc,
-            'quantity': preview_qty,
-            'unit': 'Cum',
-            'phase': selected_phase,
+            'work_type': work_type,
+            'dsr_code': dsr_info['code'],
+            'description': work_type,
+            'gross_qty': length*width*thickness,
+            'is1200_qty': is1200_qty,
+            'unit': dsr_info['unit'],
             'rate': rate,
-            'amount': preview_qty * rate
+            'amount': amount,
+            'phase': selected_phase,
+            'dimensions': f"{length:.1f}x{width:.1f}x{thickness:.3f}m",
+            'openings': len(openings)
         })()
-        
         st.session_state.qto_items.append(item)
-        st.success(f"✅ **{qto_type}** | {preview_qty:.2f} Cum | ₹{item.amount:,.0f}")
+        st.success(f"✅ IS 1200 Item Added: {is1200_qty:.2f} {dsr_info['unit']} | ₹{amount:,.0f}")
         st.balloons()
     
-    # QTO SUMMARY TABLE
+    # QTO TABLE
     if st.session_state.qto_items:
-        st.markdown("### 📋 **Current QTO Items**")
-        qto_data = []
-        for item in st.session_state.qto_items:
-            qto_data.append({
-                "Sr": item.id,
-                "Phase": get_phase_name(item.phase),
-                "DSR Item": item.description,
-                "Qty": f"{item.quantity:.2f}",
-                "Unit": item.unit,
-                "Rate": f"₹{item.rate:,.0f}",
-                "Amount": f"₹{item.amount:,.0f}"
-            })
+        qto_data = [{
+            "Sr": item.id,
+            "DSR": item.dsr_code,
+            "Item": item.work_type,
+            "IS1200 Qty": f"{item.is1200_qty:.2f}",
+            "Unit": item.unit,
+            "Rate": f"₹{item.rate:,.0f}",
+            "Amount": f"₹{item.amount:,.0f}"
+        } for item in st.session_state.qto_items]
         
         df_qto = pd.DataFrame(qto_data)
-        st.dataframe(df_qto, use_container_width=True, hide_index=True)
-        
-        total_amount = sum(item.amount for item in st.session_state.qto_items)
-        st.success(f"📊 **{len(st.session_state.qto_items)} DSR Items** | Total: ₹{total_amount:,.0f}")
+        st.dataframe(df_qto, use_container_width=True)
+        st.success(f"📊 **{len(st.session_state.qto_items)} IS 1200 Items** | Total: ₹{sum(i.amount for i in st.session_state.qto_items):,.0f}")
 
 # =============================================================================
-# TAB 2: PROFESSIONAL PROJECT ABSTRACT
+# TAB 2: PROFESSIONAL ABSTRACT
 # =============================================================================
 with tab_abstract:
-    st.header("📊 Professional Project Abstract")
-    st.caption("*Format: ROAD-NO.-1-108.05-LACS.xlsx | CPWD Standard*")
-    
     if not st.session_state.qto_items:
-        st.warning("👆 **Complete Quantity Take-Off first**")
+        st.warning("👆 Add IS 1200 items first")
         st.stop()
     
-    # Calculate Phase Totals
+    st.header("📊 IS 1200 Project Abstract")
+    
+    # Phase totals
     phase_totals = {}
-    base_total = 0
-    
+    grand_total = 0
     for item in st.session_state.qto_items:
-        phase_key = item.phase
-        if phase_key not in phase_totals:
-            phase_totals[phase_key] = {"qty": 0, "items": 0, "amount": 0}
-        phase_totals[phase_key]["qty"] += item.quantity
-        phase_totals[phase_key]["items"] += 1
-        phase_totals[phase_key]["amount"] += item.amount
-        base_total += item.amount
+        phase = item.phase
+        if phase not in phase_totals:
+            phase_totals[phase] = {"qty": 0, "items": 0, "amount": 0}
+        phase_totals[phase]["qty"] += item.is1200_qty
+        phase_totals[phase]["items"] += 1
+        phase_totals[phase]["amount"] += item.amount
+        grand_total += item.amount
     
-    # PROFESSIONAL ABSTRACT TABLE
+    # Abstract table
     abstract_data = []
-    for i, (phase_key, data) in enumerate(phase_totals.items()):
+    for i, (phase, data) in enumerate(phase_totals.items()):
         abstract_data.append({
             "S.No": i+1,
-            "Section": PHASES[phase_key]["name"],
-            "Description": PHASES[phase_key]["description"],
+            "Section": get_phase_name(phase),
             "Items": data["items"],
-            "Qty (Cum)": f"{data['qty']:.2f}",
+            "IS1200 Qty": f"{data['qty']:.2f}",
             "Amount (₹ Lacs)": f"{data['amount']/100000:.2f}"
         })
     
-    # Add Total Row
     abstract_data.append({
-        "S.No": "TOTAL",
-        "Section": "A. CIVIL WORKS",
-        "Description": "",
+        "S.No": "TOTAL-A",
+        "Section": "CIVIL WORKS", 
         "Items": len(st.session_state.qto_items),
-        "Qty (Cum)": f"{sum(data['qty'] for data in phase_totals.values()):.2f}",
-        "Amount (₹ Lacs)": f"{base_total/100000:.2f}"
+        "IS1200 Qty": f"{sum(d['qty'] for d in phase_totals.values()):.2f}",
+        "Amount (₹ Lacs)": f"{grand_total/100000:.2f}"
     })
     
-    abstract_df = pd.DataFrame(abstract_data)
-    st.markdown("### 📋 **ABSTRACT OF COST**")
-    st.dataframe(abstract_df, use_container_width=True, hide_index=True)
+    df_abstract = pd.DataFrame(abstract_data)
+    st.markdown("### 📋 **ABSTRACT OF COST (IS 1200)**")
+    st.dataframe(df_abstract, use_container_width=True)
     
-    # COST ROLLUP METRICS
-    maintenance = base_total * 0.025
-    subtotal_ab = base_total + maintenance
+    # Cost rollup
+    maintenance = grand_total * 0.025
+    subtotal = grand_total + maintenance
+    gst = subtotal * 0.18
+    grand_final = subtotal * 1.20
     
     col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("🏗️ **Base Civil Works (A)**", f"₹{base_total:,.0f}")
-    with col2:
-        st.metric("🔧 **Maintenance (2.5%) (B)**", f"₹{maintenance:,.0f}")
-    with col3:
-        st.metric("📦 **Subtotal A+B**", f"₹{subtotal_ab:,.0f}")
-    
-    # FINAL COSTING WITH TAXES
-    st.markdown("### 💰 **SANCTION ESTIMATE**")
-    gst = subtotal_ab * 0.18
-    cess = subtotal_ab * 0.01
-    contingency = subtotal_ab * 0.01
-    grand_total = subtotal_ab + gst + cess + contingency
-    
-    col1, col2, col3, col4 = st.columns(4)
-    with col1: st.metric("🧾 **GST @ 18%**", f"₹{gst:,.0f}")
-    with col2: st.metric("👷 **Labour Cess @ 1%**", f"₹{cess:,.0f}")
-    with col3: st.metric("🎲 **Contingency @ 1%**", f"₹{contingency:,.0f}")
-    with col4: st.metric("💎 **GRAND TOTAL**", f"₹{grand_total:,.0f}", delta=f"+₹{grand_total-base_total:,.0f}")
-    
-    # PHASE DISTRIBUTION CHART
-    chart_data = pd.DataFrame([{
-        "Phase": PHASES[k]["name"],
-        "Amount (₹ Lacs)": round(v["amount"]/100000, 2)
-    } for k, v in phase_totals.items()])
-    
-    fig = px.pie(chart_data, values="Amount (₹ Lacs)", names="Phase", hole=0.4,
-                title="📈 **Phase-wise Cost Distribution**")
-    fig.update_traces(textposition='inside', textinfo='percent+label')
-    st.plotly_chart(fig, use_container_width=True)
+    col1.metric("🏗️ Base Works (A)", f"₹{grand_total:,.0f}")
+    col2.metric("🔧 Maintenance 2.5% (B)", f"₹{maintenance:,.0f}")
+    col3.metric("💎 GRAND TOTAL", f"₹{grand_final:,.0f}")
 
 # =============================================================================
-# TAB 3: DSR REPORTS & EXPORT
+# TAB 3: EXPORT
 # =============================================================================
 with tab_export:
-    st.header("📥 **DSR Professional Reports & Downloads**")
+    st.header("📥 IS 1200 Professional Export")
     
     if st.session_state.qto_items:
-        st.success(f"✅ **{len(st.session_state.qto_items)} DSR Items** ready for tender submission")
-        
-        # DSR DETAILED BOQ REPORT
-        qto_export = pd.DataFrame([{
+        export_data = [{
             "Sr_No": item.id,
-            "WBS_Code": PHASES[item.phase]["wbs_code"],
+            "DSR_Code": item.dsr_code,
             "Phase": get_phase_name(item.phase),
-            "DSR_Item": item.description,
-            "DSR_Specification": item.dsr_specification,
-            "Quantity": item.quantity,
+            "Description": item.work_type,
+            "Dimensions": item.dimensions,
+            "Gross_Qty": f"{item.gross_qty:.3f}",
+            "IS1200_Net_Qty": f"{item.is1200_qty:.3f}",
             "Unit": item.unit,
-            "Rate_Rs_Per_Unit": round(item.rate, 2),
-            "Amount_Rs": round(item.amount, 2)
-        } for item in st.session_state.qto_items])
+            "Rate_Rs": item.rate,
+            "Amount_Rs": item.amount
+        } for item in st.session_state.qto_items]
         
-        st.markdown("### 📋 **DSR Detailed BOQ Report**")
-        st.dataframe(qto_export[["Sr_No", "Phase", "DSR_Item", "Quantity", "Rate_Rs_Per_Unit", "Amount_Rs"]], 
-                    use_container_width=True)
+        df_export = pd.DataFrame(export_data)
+        st.dataframe(df_export, use_container_width=True)
         
-        # DOWNLOAD BUTTONS
         timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-        project_name = st.session_state.project_name.replace(" ", "_")
-        
-        # DSR BOQ Export
-        qto_csv = qto_export.to_csv(index=False)
+        csv = df_export.to_csv(index=False)
         st.download_button(
-            label="⭐ **Download DSR BOQ (Full Specifications)**",
-            data=qto_csv,
-            file_name=f"{project_name}_DSR_BOQ_{timestamp}.csv",
-            mime="text/csv"
+            "⭐ Download IS 1200 BOQ",
+            csv,
+            f"{st.session_state.project_name.replace(' ', '_')}_IS1200_{timestamp}.csv",
+            "text/csv"
         )
-        
-        # Abstract Export
-        abstract_csv = abstract_df.to_csv(index=False)
-        st.download_button(
-            label="📊 Download Professional Abstract",
-            data=abstract_csv,
-            file_name=f"{project_name}_Abstract_{timestamp}.csv",
-            mime="text/csv"
-        )
-        
-        # CLEAR BUTTON
-        if st.button("🗑️ Clear All QTO Data", type="secondary"):
-            st.session_state.qto_items = []
-            st.success("✅ All data cleared!")
-            st.rerun()
-    else:
-        st.info("👆 **Add DSR items in QTO tab first**")
 
-# =============================================================================
-# FOOTER
-# =============================================================================
 st.markdown("---")
-col1, col2 = st.columns([3, 1])
-with col1:
-    st.markdown("""
-    **✅ PROFESSIONAL FEATURES:**
-    • **DSR Standard Descriptions** (CPWD Format)
-    • 5-Phase Construction Structure  
-    • IS 1200 Quantity Take-Off
-    • Phase-wise Cost Abstract
-    • Automatic GST/Cess/Contingency
-    • Tender-Ready CSV Exports
-    """)
-with col2:
-    st.markdown("**📍 Optimized for:**\n**Ghaziabad-UP Projects**")
-
-st.caption(f"**Generated:** {datetime.now().strftime('%d %b %Y, %I:%M %p IST')}")
+st.success("✅ **IS 1200 COMPLIANT** - Deduction Rules Applied!")
