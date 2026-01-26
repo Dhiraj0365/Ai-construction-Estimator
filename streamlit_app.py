@@ -1,9 +1,3 @@
-"""
-🏗️ CPWD DSR 2023 ESTIMATOR PRO - FINAL MASTER VERSION
-✅ IS 1200 QUANTITY RULES | PROFESSIONAL OUTPUTS | RISK & ESCALATION ANALYSIS
-✅ Ghaziabad Rates 107% | All 5 Govt Formats | Production Deployed
-"""
-
 import streamlit as st
 import pandas as pd
 import numpy as np
