@@ -1,6 +1,6 @@
 # 🏗️ AI Construction Estimator Pro - CPWD DSR 2023
 
-[![Streamlit](https://img.shields.io/badge/Streamlit-LIVE-blue)](https://ai-construction-estimator-vvzze4t8pbnugjdqtucubc.streamlit.app/)
+[Streamlit](https://img.shields.io/badge/Streamlit-LIVE-blue)](https://ai-construction-estimator-vvzze4t8pbnugjdqtucubc.streamlit.app/)
 
 ## 🚀 Features
 - ✅ **AutoCAD DWG Scanner** - AI Shape Recognition
