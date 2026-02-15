@@ -1,481 +1,467 @@
-from dataclasses import dataclass
+"""
+IS 1200 Measurement Engine – Building Works
 
+This module provides reusable helpers for civil quantity calculation
+aligned with IS 1200 style measurement, suitable for CPWD/State SoR
+estimation and MB preparation.
+
+Design goals:
+- Technically correct, audit‑friendly quantities.
+- Separate logic for volume, area, formwork and openings.
+- Conservative, IS‑style rules (no negative quantities, proper rounding).
+- Backward compatible with your existing streamlit_app usage:
+  - IS1200Engine.volume(...)
+  - IS1200Engine.wall_finish_area(...)
+  - IS1200Engine.formwork_column_area(...)
+  - IS1200Engine.formwork_beam_area(...)
+  - IS1200Engine.formwork_slab_area(...)
+
+Note:
+- Exact thresholds and rules may vary slightly between IS 1200,
+  CPWD Works Manual and local SoR practice. Key limits are parameterised
+  (e.g. 0.1 m², 0.5 m², 3.0 m²) so you can tune them if needed.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import List, Dict, Optional
+
+
+# ---------------------------------------------------------------------------
+# Internal helper dataclass for consistent results
+# ---------------------------------------------------------------------------
 
 @dataclass
-class MeasurementItem:
-    """Data class for a single measured item."""
-    description: str
-    quantity: float
-    unit: str
-    is_code_ref: str
+class MeasureResult:
+    """Container for a measurement computation."""
 
+    gross: float
+    deductions: float = 0.0
+    additions: float = 0.0
+    unit: str = ""
+    meta: Dict[str, float | str] = field(default_factory=dict)
+
+    def to_dict(self, round_to: int = 3) -> Dict[str, float | str]:
+        """Convert to dict (gross, deductions, additions, net, ...)."""
+        g = round(self.gross, round_to)
+        d = round(self.deductions, round_to)
+        a = round(self.additions, round_to)
+        n = round(max(g - d + a, 0.0), round_to)
+        out: Dict[str, float | str] = {
+            "gross": g,
+            "deductions": d,
+            "additions": a,
+            "net": n,
+        }
+        out.update(self.meta)
+        return out
+
+
+def _round_for_unit(value: float, unit: str) -> float:
+    """
+    IS‑1200 style rounding:
+    - Linear (m): 2 decimals
+    - Area (sqm): 2 decimals
+    - Volume (cum): 3 decimals
+    - Weight (kg): 2 decimals
+    Default: 3 decimals
+    """
+    unit = unit.lower().strip()
+    if unit in ("m", "rm", "rmt"):
+        return round(value, 2)
+    if unit in ("sqm", "m2", "sq.m", "sq.m."):
+        return round(value, 2)
+    if unit in ("cum", "m3", "cu.m", "cu.m."):
+        return round(value, 3)
+    if unit in ("kg", "kilogram", "kilograms"):
+        return round(value, 2)
+    return round(value, 3)
+
+
+def _normalise_openings(openings: Optional[List[Dict]]) -> List[Dict]:
+    """
+    Normalise openings to a uniform structure:
+    each opening: {"w": width, "h": height, "n": count}
+    """
+    if not openings:
+        return []
+    out: List[Dict] = []
+    for o in openings:
+        if not isinstance(o, dict):
+            continue
+        w = float(o.get("w", 0.0))
+        h = float(o.get("h", 0.0))
+        n = float(o.get("n", 1.0))
+        if w <= 0 or h <= 0 or n <= 0:
+            continue
+        out.append({"w": w, "h": h, "n": n})
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Public Engine
+# ---------------------------------------------------------------------------
 
 class IS1200Engine:
     """
-    Complete IS 1200 measurement engine for:
-    - Earthwork Excavation (Part 1 & 2)
-    - Concrete (PCC / RCC members) (Part 2)
-    - Reinforcement Steel (Part 8)
-    - Brick Masonry (Part 3)
-    - Plastering (Part 12)
-    - Flooring (Part 11)
-    - Formwork (Part 5)
-    - Painting (Part 13)
+    Core IS‑1200 style calculation helpers.
+
+    All methods return dictionaries with at least:
+    - gross
+    - deductions
+    - additions
+    - net
+
+    For backward compatibility with your Streamlit app, the
+    following methods should be considered stable:
+    - volume(...)
+    - wall_finish_area(...)
+    - formwork_column_area(...)
+    - formwork_beam_area(...)
+    - formwork_slab_area(...)
     """
 
-    # ============================================================
-    # 1. EARTHWORK EXCAVATION (IS 1200 Part 1 & 2)
-    # ============================================================
-    def measure_earthwork(
-        self,
+    # ---------------------------------------------------------------------
+    # GENERIC VOLUME – EARTHWORK, CONCRETE, BRICKWORK
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def volume(
+        L: float,
+        B: float,
+        D: float,
+        deductions: float = 0.0,
+        unit: str = "cum",
+    ) -> Dict[str, float]:
+        """
+        Generic volume as L × B × D minus explicit deductions.
+
+        Parameters
+        ----------
+        L, B, D : float
+            Length, breadth, depth (m).
+        deductions : float, optional
+            Deductions in m³ (already combined).
+        unit : str
+            Output unit (default cum).
+
+        Returns
+        -------
+        dict
+            {gross, deductions, additions, net, pct}
+        """
+        gross = max(L, 0.0) * max(B, 0.0) * max(D, 0.0)
+        deductions = max(deductions, 0.0)
+
+        # Round per unit
+        gross_r = _round_for_unit(gross, unit)
+        ded_r = _round_for_unit(deductions, unit)
+        net_r = _round_for_unit(max(gross_r - ded_r, 0.0), unit)
+
+        pct = round((ded_r / gross_r * 100.0), 2) if gross_r > 0 else 0.0
+
+        return {
+            "gross": gross_r,
+            "deductions": ded_r,
+            "additions": 0.0,
+            "net": net_r,
+            "pct": pct,
+        }
+
+    # ---------------------------------------------------------------------
+    # EARTHWORK – TRENCH EXCAVATION WITH SIDE SLOPES
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def trench_excavation(
         length: float,
-        width: float,
+        breadth_bottom: float,
         depth: float,
-        soil_type: str,
-        depth_band: str,
-        lead_band: str,
-    ) -> MeasurementItem:
+        side_slope_h_over_v: float = 0.0,
+        deductions: float = 0.0,
+        unit: str = "cum",
+    ) -> Dict[str, float]:
         """
-        Earthwork in excavation as per IS 1200 Part 1 & 2.
+        Earthwork in excavation for trenches/foundations.
 
-        Quantity = net excavated volume (L x B x D in m³)
-        Separate items for: soil type, depth range, lead range
-        No deduction: PCC volume, slips, working space
+        If side_slope_h_over_v > 0, uses average breadth as per
+        side slopes:
+            top_breadth = breadth_bottom + 2 * side_slope * depth
+            avg_breadth = (breadth_bottom + top_breadth) / 2
+
+        For vertical sides, side_slope_h_over_v = 0.
+
+        Returns
+        -------
+        dict : {gross, deductions, additions, net}
         """
-        volume = length * width * depth
+        length = max(length, 0.0)
+        breadth_bottom = max(breadth_bottom, 0.0)
+        depth = max(depth, 0.0)
 
-        desc = (
-            f"Earthwork in excavation in {soil_type} soil "
-            f"up to {depth_band} depth, lead {lead_band}"
-        )
+        if side_slope_h_over_v > 0.0:
+            top_b = breadth_bottom + 2.0 * side_slope_h_over_v * depth
+            avg_b = (breadth_bottom + top_b) / 2.0
+            gross = length * avg_b * depth
+        else:
+            gross = length * breadth_bottom * depth
 
-        return MeasurementItem(
-            description=desc,
-            quantity=volume,
-            unit="Cum",
-            is_code_ref="IS 1200 Part 1 & 2",
-        )
+        mr = MeasureResult(gross=gross, deductions=max(deductions, 0.0), unit=unit)
+        return mr.to_dict(round_to=3)
 
-    # ============================================================
-    # 2. CONCRETE (Generic PCC / RCC)
-    # ============================================================
-    def measure_concrete(
-        self,
+    # ---------------------------------------------------------------------
+    # BRICKWORK – WALL VOLUME WITH OPENING DEDUCTIONS
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def brickwork_wall(
         length: float,
-        width: float,
         thickness: float,
-        grade: str,
-        element_type: str,
-    ) -> MeasurementItem:
+        height: float,
+        openings: Optional[List[Dict]] = None,
+        small_opening_limit: float = 0.10,   # sqm (typical IS‑1200)
+        unit: str = "cum",
+    ) -> Dict[str, float]:
         """
-        Generic concrete volume = L x B x T (m³).
-        Used for PCC or simple RCC elements.
+        Brick masonry in wall.
+
+        - Gross = length × thickness × height
+        - No deduction for individual openings up to small_opening_limit
+          (IS 1200 Part 5, small apertures).
+        - Full deduction for larger openings: area × thickness.
+
+        Parameters
+        ----------
+        openings : list of dict, optional
+            Each {"w": width_m, "h": height_m, "n": count}
+
+        Returns
+        -------
+        dict : {gross, deductions, additions, net}
         """
-        volume = length * width * thickness
-        desc = f"{grade} {element_type} concrete {length:.2f} m x {width:.2f} m x {thickness:.3f} m"
+        length = max(length, 0.0)
+        thickness = max(thickness, 0.0)
+        height = max(height, 0.0)
 
-        return MeasurementItem(
-            description=desc,
-            quantity=volume,
-            unit="Cum",
-            is_code_ref="IS 1200 Part 2",
-        )
+        gross = length * thickness * height
 
-    # ============================================================
-    # 3. RCC MEMBERS (SLAB / BEAM / COLUMN / FOOTING)
-    # ============================================================
-    def measure_rcc_member(
-        self,
-        member_type: str,
-        length: float,
-        width: float,
-        depth_or_height: float,
-        grade: str = "M25",
-    ) -> MeasurementItem:
-        """
-        RCC concrete quantity by member type (IS 1200 Part 2 & IS 456).
+        norm_openings = _normalise_openings(openings)
+        ded = 0.0
+        for o in norm_openings:
+            area_one = o["w"] * o["h"]
+            n = o["n"]
+            if area_one <= small_opening_limit:
+                # No deduction (small openings)
+                continue
+            ded += area_one * thickness * n
 
-        Slab:   L x B x T
-        Beam:   L x B x D
-        Column: L x B x H
-        Footing:L x B x D
-        """
-        mt = member_type.lower().strip()
+        mr = MeasureResult(gross=gross, deductions=ded, unit=unit)
+        return mr.to_dict(round_to=3)
 
-        if mt == "slab":
-            volume = length * width * depth_or_height
-            desc = f"RCC {grade} slab {length:.2f} m x {width:.2f} m x {depth_or_height:.3f} m"
-        elif mt == "beam":
-            volume = length * width * depth_or_height
-            desc = f"RCC {grade} beam {length:.2f} m x {width:.2f} m x {depth_or_height:.3f} m"
-        elif mt == "column":
-            volume = length * width * depth_or_height
-            desc = f"RCC {grade} column {length:.2f} m x {width:.2f} m x {depth_or_height:.3f} m"
-        elif mt == "footing":
-            volume = length * width * depth_or_height
-            desc = f"RCC {grade} footing {length:.2f} m x {width:.2f} m x {depth_or_height:.3f} m"
-        else:
-            volume = length * width * depth_or_height
-            desc = f"RCC {grade} {member_type}"
-
-        return MeasurementItem(
-            description=desc,
-            quantity=volume,
-            unit="Cum",
-            is_code_ref="IS 1200 Part 2, IS 456",
-        )
-
-    # ============================================================
-    # 4. REINFORCEMENT STEEL (Direct kg)
-    # ============================================================
-    def measure_reinforcement(
-        self,
-        weight_kg: float,
-        bar_type: str = "TMT",
-    ) -> MeasurementItem:
-        """Direct reinforcement measurement from BBS or site data (kg)."""
-        desc = f"Reinforcement steel ({bar_type})"
-
-        return MeasurementItem(
-            description=desc,
-            quantity=weight_kg,
-            unit="Kg",
-            is_code_ref="IS 1200 Part 8",
-        )
-
-    # ============================================================
-    # 5. REINFORCEMENT STEEL (From RCC Volume – Thumb Rules)
-    # ============================================================
-    def estimate_reinforcement_from_rcc(
-        self,
-        member_type: str,
-        concrete_volume: float,
-    ) -> MeasurementItem:
-        """
-        Quick steel estimate using typical kg/m³ thumb rules:
-        - Slab:   ~80 kg/m³
-        - Beam:   ~120 kg/m³
-        - Column: ~140 kg/m³
-        - Footing:~80 kg/m³
-
-        For preliminary estimates; replace with BBS for final.
-        """
-        mt = member_type.lower().strip()
-        if mt == "slab":
-            density = 80.0
-        elif mt == "beam":
-            density = 120.0
-        elif mt == "column":
-            density = 140.0
-        elif mt == "footing":
-            density = 80.0
-        else:
-            density = 100.0
-
-        weight_kg = concrete_volume * density
-        desc = f"Reinforcement steel (estimated) in RCC {member_type} @ {density:.0f} kg/m³"
-
-        return MeasurementItem(
-            description=desc,
-            quantity=weight_kg,
-            unit="Kg",
-            is_code_ref="IS 1200 Part 8 (thumb rule)",
-        )
-
-    # ============================================================
-    # 6. BRICK MASONRY (With Openings)
-    # ============================================================
-    def measure_masonry(
-        self,
+    # ---------------------------------------------------------------------
+    # PLASTER / PAINT – WALL FINISH AREA WITH OPENINGS
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def wall_finish_area(
         length: float,
         height: float,
-        thickness: float,
-        material: str = "brick",
-        n_small_openings: int = 0,
-        area_small_each: float = 0.0,
-        n_large_openings: int = 0,
-        area_large_each: float = 0.0,
-    ) -> MeasurementItem:
+        sides: int = 2,
+        openings: Optional[List[Dict]] = None,
+        small_opening_limit: float = 0.50,   # no deduction
+        medium_opening_limit: float = 3.00,  # deduct one face only
+        unit: str = "sqm",
+    ) -> Dict[str, float]:
         """
-        Masonry measurement as per IS 1200 Part 3.
+        Wall surface area for plaster/putty/painting as per IS‑1200 style.
 
-        Gross volume = L x H x T
-        Deduct only openings > 0.1 m²
-        Do not deduct openings ≤ 0.1 m² or small beam/column ends
+        Simplified rule set:
+        - Gross area = length × height × sides.
+        - For each opening (area A per face):
+          * A <= small_opening_limit  → no deduction for opening or jambs.
+          * small_opening_limit < A <= medium_opening_limit
+                → deduct A for ONE face only (for both‑side finish).
+          * A > medium_opening_limit → deduct A × sides (full opening on all sides).
+
+        Parameters
+        ----------
+        openings : list of dict, optional
+            Each {"w": width_m, "h": height_m, "n": count}
+
+        Returns
+        -------
+        dict : {gross, deductions, additions, net}
         """
-        volume_gross = length * height * thickness
+        length = max(length, 0.0)
+        height = max(height, 0.0)
+        sides = max(int(sides), 0)
 
-        # Small openings (≤ 0.1 m²) – information only, no deduction
-        small_opening_area = n_small_openings * area_small_each
+        gross = length * height * sides
 
-        # Large openings (> 0.1 m²) – deduct
-        large_opening_area = n_large_openings * area_large_each
-        volume_deduction = large_opening_area * thickness
+        norm_openings = _normalise_openings(openings)
+        ded = 0.0
 
-        volume_net = volume_gross - volume_deduction
-        if volume_net < 0:
-            volume_net = 0.0
+        for o in norm_openings:
+            A_one = o["w"] * o["h"]  # area on one face
+            n = o["n"]
 
-        mat = material.capitalize().strip()
+            if A_one <= small_opening_limit:
+                # No deduction
+                continue
+            elif A_one <= medium_opening_limit:
+                # Deduct one face only (per opening group)
+                ded += A_one * n
+            else:
+                # Deduct for all sides
+                ded += A_one * sides * n
 
-        desc_parts = [
-            f"{mat} masonry in cement mortar",
-            f"{thickness:.3f} m thick wall",
-        ]
-        if n_large_openings > 0:
-            desc_parts.append(
-                f"with deduction for {n_large_openings} opening(s) > 0.1 m² as per IS 1200 Part 3"
-            )
-        else:
-            desc_parts.append(
-                "no deduction for openings ≤ 0.1 m² as per IS 1200 Part 3"
-            )
+        mr = MeasureResult(gross=gross, deductions=ded, unit=unit)
+        return mr.to_dict(round_to=2)
 
-        desc = ", ".join(desc_parts)
-
-        return MeasurementItem(
-            description=desc,
-            quantity=volume_net,
-            unit="Cum",
-            is_code_ref="IS 1200 Part 3",
-        )
-
-    # ============================================================
-    # 7. PLASTERING (With Openings)
-    # ============================================================
-    def measure_plaster(
-        self,
+    # ---------------------------------------------------------------------
+    # FLOORING / TILING AREA
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def floor_area(
         length: float,
-        height: float,
-        face_count: int = 1,
-        n_small_openings: int = 0,
-        area_small_each: float = 0.0,
-        n_large_openings: int = 0,
-        area_large_each: float = 0.0,
-        thickness_mm: float = 12.0,
-    ) -> MeasurementItem:
+        breadth: float,
+        cutouts: Optional[List[Dict]] = None,
+        unit: str = "sqm",
+    ) -> Dict[str, float]:
         """
-        Plaster measurement as per IS 1200 Part 12.
+        Floor / roof / tile area.
 
-        Base area per face = L x H (Sqm)
-        No deduction for openings ≤ 0.5 m²
-        Deduct openings > 0.5 m²
-        Thickness for description/rate only; quantity in Sqm
+        Gross = length × breadth (single side).
+        cutouts: list of {"w": width_m, "h": height_m, "n": count}
         """
-        base_area_one_face = length * height
+        length = max(length, 0.0)
+        breadth = max(breadth, 0.0)
+        gross = length * breadth
 
-        # Small openings (≤ 0.5 m²) – no deduction, info only
-        small_opening_area_total = n_small_openings * area_small_each
+        norm_cutouts = _normalise_openings(cutouts)
+        ded = 0.0
+        for c in norm_cutouts:
+            ded += c["w"] * c["h"] * c["n"]
 
-        # Large openings (> 0.5 m²) – deduct
-        large_opening_area_total = n_large_openings * area_large_each
+        mr = MeasureResult(gross=gross, deductions=ded, unit=unit)
+        return mr.to_dict(round_to=2)
 
-        gross_area_all_faces = base_area_one_face * face_count
-        deduction_all_faces = large_opening_area_total * face_count
+    # ---------------------------------------------------------------------
+    # RCC FORMWORK AREAS
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def formwork_column_area(
+        L: float,
+        B: float,
+        H: float,
+        unit: str = "sqm",
+    ) -> float:
+        """
+        Formwork for column – area of four faces.
 
-        net_area = gross_area_all_faces - deduction_all_faces
-        if net_area < 0:
-            net_area = 0.0
+        Approx as:
+            2 × (L + B) × H
 
-        face_text = "one face" if face_count == 1 else f"{face_count} faces"
+        Returns
+        -------
+        float : area in sqm (rounded as per unit).
+        """
+        L = max(L, 0.0)
+        B = max(B, 0.0)
+        H = max(H, 0.0)
+        area = 2.0 * (L + B) * H
+        return _round_for_unit(area, unit)
 
-        desc_parts = [
-            f"{thickness_mm:.0f} mm thick cement plaster on {face_text} of wall surfaces",
-        ]
-        if n_large_openings > 0:
-            desc_parts.append(
-                f"with deduction for {n_large_openings} opening(s) > 0.5 m² as per IS 1200 Part 12"
-            )
-        else:
-            desc_parts.append(
-                "no deduction for openings ≤ 0.5 m² as per IS 1200 Part 12"
-            )
-
-        desc = ", ".join(desc_parts)
-
-        return MeasurementItem(
-            description=desc,
-            quantity=net_area,
-            unit="Sqm",
-            is_code_ref="IS 1200 Part 12",
-        )
-
-    # ============================================================
-    # 8. FLOORING (With Openings)
-    # ============================================================
-    def measure_flooring(
-        self,
+    @staticmethod
+    def formwork_beam_area(
+        breadth: float,
+        depth: float,
         length: float,
-        width: float,
-        n_small_openings: int = 0,
-        area_small_each: float = 0.0,
-        n_large_openings: int = 0,
-        area_large_each: float = 0.0,
-        thickness_mm: float = 20.0,
-        floor_type: str = "cement concrete",
-    ) -> MeasurementItem:
+        unit: str = "sqm",
+    ) -> float:
         """
-        Flooring measurement as per IS 1200 Part 11.
+        Formwork for beam – 3 exposed sides (bottom + 2 sides).
 
-        Base area = L x B (finished floor surface, Sqm)
-        No deduction for openings ≤ 0.1 m²
-        Deduct openings > 0.1 m²
-        Thickness for description only; quantity in Sqm
+        Approx as:
+            (2 × depth + breadth) × length
         """
-        gross_area = length * width
+        breadth = max(breadth, 0.0)
+        depth = max(depth, 0.0)
+        length = max(length, 0.0)
+        area = (2.0 * depth + breadth) * length
+        return _round_for_unit(area, unit)
 
-        # Small openings (≤ 0.1 m²) – no deduction
-        small_opening_area_total = n_small_openings * area_small_each
-
-        # Large openings (> 0.1 m²) – deduct
-        large_opening_area_total = n_large_openings * area_large_each
-
-        net_area = gross_area - large_opening_area_total
-        if net_area < 0:
-            net_area = 0.0
-
-        desc_parts = [
-            f"{thickness_mm:.0f} mm thick {floor_type} flooring on finished surface",
-        ]
-        if n_large_openings > 0:
-            desc_parts.append(
-                f"with deduction for {n_large_openings} opening(s) > 0.1 m² as per IS 1200 Part 11"
-            )
-        else:
-            desc_parts.append(
-                "no deduction for openings ≤ 0.1 m² as per IS 1200 Part 11"
-            )
-
-        desc = ", ".join(desc_parts)
-
-        return MeasurementItem(
-            description=desc,
-            quantity=net_area,
-            unit="Sqm",
-            is_code_ref="IS 1200 Part 11",
-        )
-
-    # ============================================================
-    # 9. FORMWORK (Concrete Contact Area)
-    # ============================================================
-    def measure_formwork(
-        self,
-        member_type: str,
+    @staticmethod
+    def formwork_slab_area(
         length: float,
-        width: float,
-        depth_or_height: float,
-    ) -> MeasurementItem:
+        breadth: float,
+        unit: str = "sqm",
+    ) -> float:
         """
-        Formwork measurement as per IS 1200 Part 5.
+        Formwork for slab – soffit area.
 
-        Quantity = concrete contact area (Sqm):
-        - Slab:  soffit area = plan (L x B)
-        - Beam:  2 sides (D x L) + soffit (B x L)
-        - Column: 4 sides = perimeter x height
-        - Footing: 2(L x D) + 2(B x D)
-
-        No deduction for small openings ≤ 0.4 m², fillets, chamfers.
+        Approx as:
+            length × breadth
         """
-        mt = member_type.lower().strip()
+        length = max(length, 0.0)
+        breadth = max(breadth, 0.0)
+        area = length * breadth
+        return _round_for_unit(area, unit)
 
-        if mt == "slab":
-            area = length * width
-            desc = f"Formwork to soffit of RCC slab {length:.2f} m x {width:.2f} m"
-        elif mt == "beam":
-            side_area = 2 * (depth_or_height * length)
-            bottom_area = width * length
-            area = side_area + bottom_area
-            desc = (
-                f"Formwork to sides and soffit of RCC beam "
-                f"{length:.2f} m x {width:.2f} m x {depth_or_height:.2f} m"
-            )
-        elif mt == "column":
-            perimeter = 2 * (length + width)
-            area = perimeter * depth_or_height
-            desc = (
-                f"Formwork to sides of RCC column "
-                f"{length:.2f} m x {width:.2f} m x {depth_or_height:.2f} m"
-            )
-        elif mt == "footing":
-            area = 2 * (length * depth_or_height) + 2 * (width * depth_or_height)
-            desc = (
-                f"Formwork to sides of RCC footing "
-                f"{length:.2f} m x {width:.2f} m x {depth_or_height:.2f} m"
-            )
-        else:
-            area = length * depth_or_height
-            desc = f"Formwork to RCC {member_type}"
-
-        full_desc = (
-            desc
-            + ", measured as concrete contact area, "
-            "no deduction for small openings ≤ 0.4 m² as per IS 1200 Part 5"
-        )
-
-        return MeasurementItem(
-            description=full_desc,
-            quantity=area,
-            unit="Sqm",
-            is_code_ref="IS 1200 Part 5",
-        )
-
-    # ============================================================
-    # 10. PAINTING / FINISHING (With Openings)
-    # ============================================================
-    def measure_painting(
-        self,
-        length: float,
-        height: float,
-        face_count: int = 1,
-        n_small_openings: int = 0,
-        area_small_each: float = 0.0,
-        n_large_openings: int = 0,
-        area_large_each: float = 0.0,
-        coats: int = 2,
-        paint_type: str = "acrylic",
-    ) -> MeasurementItem:
+    # ---------------------------------------------------------------------
+    # SIMPLE REBAR UTILITIES (OPTIONAL)
+    # ---------------------------------------------------------------------
+    @staticmethod
+    def steel_from_kg_per_cum(
+        concrete_volume_cum: float,
+        kg_per_cum: float,
+        unit: str = "kg",
+    ) -> Dict[str, float]:
         """
-        Painting measurement as per IS 1200 Part 13.
+        Convenience function for RCC estimation when you use
+        empirical kg of steel per cubic metre of RCC.
 
-        Uses same area rules as plaster (deduct only openings > 0.5 m²)
-        Quantity = net surface area (Sqm)
-        Coats and type in description only; they affect rate, not quantity
+        Parameters
+        ----------
+        concrete_volume_cum : float
+            Net concrete volume in m³.
+        kg_per_cum : float
+            Assumed steel consumption in kg/m³.
+
+        Returns
+        -------
+        dict : {gross, deductions, additions, net}
+               (all values same, in kg)
         """
-        base_area_one_face = length * height
+        concrete_volume_cum = max(concrete_volume_cum, 0.0)
+        kg_per_cum = max(kg_per_cum, 0.0)
+        wt = concrete_volume_cum * kg_per_cum
+        mr = MeasureResult(gross=wt, deductions=0.0, unit=unit)
+        return mr.to_dict(round_to=2)
 
-        # Small openings (≤ 0.5 m²) – no deduction
-        small_opening_area_total = n_small_openings * area_small_each
+    # You can extend this class further with:
+    # - earthwork_roadwork(...)
+    # - concrete_pavement(...)
+    # - detailed lintel / chajja / sill rules
+    # - etc.
 
-        # Large openings (> 0.5 m²) – deduct
-        large_opening_area_total = n_large_openings * area_large_each
 
-        gross_area_all_faces = base_area_one_face * face_count
-        deduction_all_faces = large_opening_area_total * face_count
-
-        net_area = gross_area_all_faces - deduction_all_faces
-        if net_area < 0:
-            net_area = 0.0
-
-        face_text = "one face" if face_count == 1 else f"{face_count} faces"
-        coat_text = f"{coats} coats" if coats > 1 else "one coat"
-
-        desc_parts = [
-            f"{coat_text} of {paint_type} paint over primer on {face_text}",
-        ]
-        if n_large_openings > 0:
-            desc_parts.append(
-                f"with deduction for {n_large_openings} opening(s) > 0.5 m² as per IS 1200 Part 13"
-            )
-        else:
-            desc_parts.append(
-                "no deduction for openings ≤ 0.5 m² as per IS 1200 Part 13"
-            )
-
-        desc = ", ".join(desc_parts)
-
-        return MeasurementItem(
-            description=desc,
-            quantity=net_area,
-            unit="Sqm",
-            is_code_ref="IS 1200 Part 13",
-        )
+# If you want a quick standalone test, run this file directly.
+if __name__ == "__main__":
+    # Example self‑test
+    print("Volume test:", IS1200Engine.volume(5, 2, 0.3))
+    print(
+        "Wall finish with opening:",
+        IS1200Engine.wall_finish_area(
+            length=5,
+            height=3,
+            sides=2,
+            openings=[{"w": 1.2, "h": 1.5, "n": 2}],
+        ),
+    )
+    print(
+        "Brickwork:",
+        IS1200Engine.brickwork_wall(
+            length=5,
+            thickness=0.23,
+            height=3,
+            openings=[{"w": 1.0, "h": 2.1, "n": 1}],
+        ),
+    )
